@@ -7,6 +7,12 @@ Each tool is one HTML file. The file holds the markup, the styles and the
 script. There is no build step, no install and no package manager. Open the
 file in a browser and the tool runs.
 
+<div align="center">
+  <a href="https://p4ntomime.github.io/procrastination-tools/">
+    <img src="assets/open-tools.svg" alt="procrastination tools" width="540">
+  </a>
+</div>
+
 ## The tools
 
 | Tool | What it does | Open |
