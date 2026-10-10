@@ -1,0 +1,1730 @@
+<!doctype html>
+<!--
+  gantt-a4, part of procrastination-tools
+  https://github.com/USERNAME/procrastination-tools
+
+  One self-contained file. No build step, no dependencies, no network access.
+  Everything stays in this browser.
+
+  The code below was written by an AI assistant (Claude) to a specification,
+  then tested by hand. It is not minified: read it before you trust it with
+  anything that matters.
+
+  MIT licence. Copyright (c) 2026 USERNAME.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%232f6f9f'/%3E%3Crect%20x='5'%20y='7.5'%20width='17'%20height='4.2'%20rx='2.1'%20fill='%23fff'/%3E%3Crect%20x='10'%20y='13.9'%20width='17'%20height='4.2'%20rx='2.1'%20fill='%23fff'%20opacity='.78'/%3E%3Crect%20x='7'%20y='20.3'%20width='12'%20height='4.2'%20rx='2.1'%20fill='%23fff'%20opacity='.58'/%3E%3C/svg%3E">
+<title>Gantt A4</title>
+<style>
+/* Layout: two panes — source/inspector on the left, true-to-size A4 sheets on the right.
+   Paper is always light; only the app chrome follows the viewer's theme. */
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --sunk:#eceef1;
+  --ink:#1b1f24; --dim:#5d6672; --faint:#8b949e;
+  --line:#d7dbe0; --accent:#2f6f9f; --accent-soft:#e3edf5;
+  --danger:#a8342f;
+  --btn:#eceef1; --btn-hv:#e0e4e9; --btn-ac:#d3d9e0;
+  --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#15181c; --panel:#1d2126; --sunk:#12151a;
+    --ink:#e6e9ed; --dim:#9aa4b0; --faint:#6e7884;
+    --line:#2e343b; --accent:#6aa8d8; --accent-soft:#1f2c36;
+    --danger:#e08a84; color-scheme:dark;
+    --btn:#272d34; --btn-hv:#313841; --btn-ac:#3b434e;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15181c; --panel:#1d2126; --sunk:#12151a;
+  --ink:#e6e9ed; --dim:#9aa4b0; --faint:#6e7884;
+  --line:#2e343b; --accent:#6aa8d8; --accent-soft:#1f2c36;
+  --danger:#e08a84; color-scheme:dark;
+  --btn:#272d34; --btn-hv:#313841; --btn-ac:#3b434e;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 var(--ui)}
+
+.app{display:flex;height:100%;align-items:stretch}
+.side{width:380px;min-width:300px;flex:0 0 auto;background:var(--panel);border-right:1px solid var(--line);
+      display:flex;flex-direction:column;overflow:hidden}
+.side-scroll{overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+.main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+
+.bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);
+     background:var(--panel);flex-wrap:wrap}
+.brand{font-weight:650;letter-spacing:.01em;margin-right:4px}
+.brand small{font-weight:400;color:var(--faint);margin-left:6px}
+.spacer{flex:1 1 auto}
+
+select,input[type=text],input[type=number],input[type=date]{
+  font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+  border-radius:5px;padding:4px 8px}
+button{font:inherit;color:var(--ink);background:var(--btn);border:0;border-radius:5px;
+  padding:5px 9px;cursor:pointer;transition:background .13s ease}
+button:hover{background:var(--btn-hv)}
+button:active{background:var(--btn-ac)}
+select,input[type=checkbox]{cursor:pointer}
+button.primary{background:var(--accent);color:#fff;font-weight:600}
+button.primary:hover{background:var(--accent);filter:brightness(1.08)}
+button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+button.mini{padding:2px 7px;font-size:12px}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;line-height:0;
+  background:none;border:0;padding:3px;color:var(--dim);border-radius:6px}
+.iconbtn:hover{color:var(--ink);background:var(--accent-soft)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--accent);outline-offset:1px}
+label{font-size:12px;color:var(--dim)}
+
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);
+   margin:0 0 6px;font-weight:650}
+.card{border:1px solid var(--line);border-radius:7px;padding:10px;background:var(--panel)}
+
+textarea#iNote{width:100%;resize:vertical;font:inherit;background:var(--panel);color:var(--ink);
+  border:1px solid var(--line);border-radius:5px;padding:5px 7px;min-height:52px}
+textarea#src{width:100%;height:340px;resize:vertical;font:12px/1.55 var(--mono);
+  background:var(--sunk);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:9px;
+  white-space:pre;overflow-wrap:normal;overflow-x:auto;tab-size:2}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid2 > div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.grid2 input,.grid2 select{width:100%}
+.swatches{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.swatches label{display:flex;align-items:center;gap:7px;color:var(--ink);font-size:12.5px;cursor:pointer}
+input[type=color]{width:34px;height:22px;padding:1px;border:1px solid var(--line);
+  border-radius:4px;background:var(--panel);cursor:pointer;flex:0 0 auto}
+.checks{display:flex;flex-direction:column;gap:5px}
+.checks label{display:flex;align-items:center;gap:7px;color:var(--ink);font-size:12.5px;cursor:pointer}
+
+.note{font-size:12px;color:var(--dim)}
+/* Native date inputs start the week on Sunday for en-US locales and the page
+   cannot override that, so the picker is built here instead — Monday first,
+   with the ISO week numbers this chart is keyed to. */
+input.dateIn{font-variant-numeric:tabular-nums}
+input.dateIn.bad{border-color:var(--danger)}
+.menu{position:fixed;z-index:70;min-width:216px;max-width:280px;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;padding:5px;
+  box-shadow:0 10px 30px rgba(0,0,0,.24)}
+.menu button{display:block;width:100%;text-align:left;border:0;
+  background:none;padding:6px 9px;border-radius:5px;font:inherit;color:var(--ink);cursor:pointer}
+.menu button:hover:not(:disabled){background:var(--accent-soft);border-color:transparent}
+.menu button:disabled{opacity:.38;cursor:default}
+.menu button small{color:var(--faint);font-size:11px}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+.menu .mhead{padding:5px 9px 7px;font-size:11px;color:var(--faint);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--line);margin-bottom:4px}
+.cal{position:fixed;z-index:60;width:244px;background:var(--panel);border:1px solid var(--line);
+     border-radius:8px;padding:9px;box-shadow:0 10px 30px rgba(0,0,0,.22)}
+.cal-h{display:flex;align-items:center;gap:4px;margin-bottom:7px}
+.cal-h b{flex:1;text-align:center;font-size:12.5px;font-weight:650}
+.cal-g{display:grid;grid-template-columns:24px repeat(7,1fr);gap:1px}
+.cal-g > div{text-align:center;font-size:11.5px;line-height:1.9;border-radius:4px;
+             font-variant-numeric:tabular-nums}
+.cal-dow{color:var(--faint);font-weight:650;font-size:10.5px}
+.cal-kw{color:var(--faint);font-size:10px;border-right:1px solid var(--line)}
+.cal-d{cursor:pointer}
+.cal-d:hover{background:var(--sunk)}
+.cal-d.cal-out{opacity:.4}
+.cal-d.cal-we{color:var(--dim)}
+.cal-d.cal-rng{background:var(--accent-soft)}
+.cal-d.cal-today{box-shadow:inset 0 0 0 1.5px var(--accent);font-weight:700}
+.cal-d.cal-cur{background:var(--accent);color:#fff;font-weight:700}
+.cal-f{display:flex;gap:6px;margin-top:8px;align-items:center}
+.cal-f .note{flex:1;font-size:11px}
+.lkdot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}
+.lkdot.ok{background:#2e9e5b} .lkdot.bad{background:var(--danger)}
+.lkdot.busy{background:#d08a1f}
+.warn{font-size:12px;color:var(--danger);display:flex;flex-direction:column;gap:3px}
+.warn:empty{display:none}
+kbd{font:11px var(--mono);background:var(--sunk);border:1px solid var(--line);
+    border-radius:3px;padding:0 4px}
+
+.preview{flex:1 1 auto;overflow:auto;padding:22px;background:var(--bg);text-align:center;
+  scrollbar-gutter:stable both-edges}
+.pagewrap{margin:0 auto 22px;overflow:hidden}
+.page{background:#fff;color:#111;box-shadow:0 2px 14px rgba(0,0,0,.18);
+      transform-origin:top left;position:relative;text-align:left;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .page{box-shadow:0 2px 18px rgba(0,0,0,.6)}}
+
+/* ---- the sheet itself: everything positioned in mm ---- */
+.sheet{position:relative;width:100%;height:100%;font-family:var(--ui);color:#111}
+.s-title{position:absolute;font-weight:650;color:#111;white-space:nowrap;overflow:hidden}
+.s-sub{position:absolute;color:#555;white-space:nowrap;overflow:hidden}
+.s-foot{position:absolute;color:#777;white-space:nowrap}
+.chart{position:absolute;overflow:hidden}
+
+.gl{position:absolute;top:0;background:#e4e7ea}
+.gl.mo{background:#b9bfc6}
+.gl.hz{left:0;background:#eceef0}
+.today{position:absolute;background:#c0392b;opacity:.75}
+
+.hcell{position:absolute;display:flex;align-items:center;justify-content:center;
+       color:#333;white-space:nowrap;overflow:hidden;border-left:.2mm solid #cdd2d7}
+.hcell.mo{font-weight:650;background:#f2f4f6;color:#222}
+.hcell.wk{color:#555}
+.hline{position:absolute;left:0;background:#9aa1a8}
+.pw{position:absolute;right:.35mm;bottom:.15mm;color:#a9b0b7;line-height:1;
+    font-variant-numeric:tabular-nums;pointer-events:none}
+
+.lbl{position:absolute;display:flex;align-items:center;white-space:nowrap;overflow:hidden;color:#111}
+.lbl.ph{font-weight:700}
+.lbl.ms{font-style:italic;color:#333}
+.rowfill{position:absolute;left:0;background:#f7f8f9}
+.rowhit{position:absolute;left:0;background:transparent}
+.phfill{position:absolute;left:0;background:#eef1f4}
+.dcell{position:absolute;display:flex;align-items:center;color:#555;white-space:nowrap;
+       overflow:hidden;font-variant-numeric:tabular-nums}
+
+.bar2{position:absolute;border-radius:.5mm;background:var(--c,#2f6f9f);cursor:grab}
+.bar2 .prog{position:absolute;left:0;top:0;bottom:0;background:rgba(0,0,0,.34);
+  border-radius:.5mm 0 0 .5mm;box-shadow:inset -.25mm 0 0 rgba(255,255,255,.6)}
+.bar2 .hl,.bar2 .hr{position:absolute;top:0;bottom:0;width:1.6mm;cursor:ew-resize}
+.bar2 .hl{left:-.3mm} .bar2 .hr{right:-.3mm}
+.bar2.drag{cursor:grabbing;opacity:.85}
+.grp{position:absolute;background:#5c6773}
+.grp .cap{position:absolute;width:0;height:0;border-style:solid}
+.ms2{position:absolute;background:var(--c,#b8860b);cursor:grab;
+     clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+
+.pctxt{position:absolute;display:flex;align-items:center;color:#444;white-space:nowrap}
+.arrows{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+/* selection is an editing affordance — never printed */
+@media screen{
+  .lbl[data-row]{cursor:text}
+  .lbl.editing{background:#fff;color:#111;overflow:visible;z-index:6;cursor:text;
+    outline:1.6px solid #2f6f9f;outline-offset:1px;border-radius:2px;
+    box-shadow:0 1px 7px rgba(0,0,0,.2)}
+  .rowsel{position:absolute;left:0;background:rgba(192,57,43,.10);
+          box-shadow:inset 0 0 0 .3mm rgba(192,57,43,.5);pointer-events:none}
+  .bar2.sel{outline:.45mm solid #c0392b;outline-offset:.35mm}
+  .ms2.sel{outline:.4mm solid #c0392b;outline-offset:.5mm}
+}
+@media print{ .rowsel{display:none !important}
+  /* a focused contenteditable keeps the UA focus ring even in print media */
+  .lbl{outline:0 !important;box-shadow:none !important;background:transparent !important} }
+.legend{position:absolute;display:flex;align-items:center;gap:2mm;color:#555;white-space:nowrap}
+.nmark{font-size:.72em;vertical-align:super;line-height:0;margin-left:.5mm;
+  color:#2f6f9f;text-decoration:none;font-weight:650}
+.notes{position:absolute}
+.nitem{display:grid;grid-template-columns:7mm 1fr;gap:0 2mm;margin-bottom:2.4mm;break-inside:avoid}
+.nnum{text-align:right;color:#2f6f9f;font-weight:650;font-variant-numeric:tabular-nums}
+.nbody{color:#222;line-height:1.45}
+.nbody b{font-weight:650}
+.nwhen{color:#777;font-variant-numeric:tabular-nums}
+.ntext{display:block;color:#333;margin-top:.4mm}
+.legend i{display:inline-block;border-radius:.4mm}
+
+@media (max-width:900px){
+  .app{flex-direction:column}
+  .side{width:auto;border-right:0;border-bottom:1px solid var(--line);max-height:52vh}
+}
+
+@media print{
+  html,body{height:auto;background:#fff}
+  .app{display:block;height:auto}
+  .side,.bar{display:none !important}
+  .main{overflow:visible;display:block}
+  .preview{overflow:visible;padding:0;background:#fff;text-align:left}
+  .pagewrap{margin:0 !important;height:auto !important;width:auto !important;overflow:visible}
+  .page{box-shadow:none !important;transform:none !important;margin:0 !important;
+        break-after:page;page-break-after:always}
+  .pagewrap:last-child .page{break-after:auto;page-break-after:auto}
+}
+</style>
+<style id="pagerule">@page{size:A4 landscape;margin:0}</style>
+<script>/* apply the shared theme before first paint to avoid a flash */
+try{ var _t=localStorage.getItem("ptools.theme"); if(_t==="dark"||_t==="light") document.documentElement.setAttribute("data-theme",_t); }catch(e){}</script>
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="bar">
+      <span class="brand">Gantt A4<small>timeline → PDF</small></span>
+      <span class="spacer"></span>
+      <button class="mini iconbtn" id="themeBtn" type="button" aria-label="Switch the theme" title="Switch the light/dark app theme"></button>
+    </div>
+    <div class="side-scroll">
+
+      <section>
+        <h2>Source</h2>
+        <textarea id="src" spellcheck="false" aria-label="Gantt source text"></textarea>
+        <div class="warn" id="errs"></div>
+        <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap">
+          <button class="mini" id="copyBtn">Copy source</button>
+          <button class="mini" id="saveBtn">Save .gantt</button>
+          <button class="mini" id="loadBtn">Open…</button>
+          <button class="mini" id="fmtBtn">Tidy</button>
+          <input type="file" id="fileIn" accept=".gantt,.txt,.md" hidden>
+        </div>
+
+        <div class="card" id="linkCard" style="margin-top:10px">
+          <h2>Linked file</h2>
+          <div id="linkIdle">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="mini" id="linkOpen">Link existing…</button>
+              <button class="mini" id="linkNew">Link new file…</button>
+              <button class="mini" id="linkAgain" hidden>Reconnect</button>
+            </div>
+            <p class="note" style="margin:7px 0 0" id="linkNote">
+              Keeps a <code>.gantt</code> file on disk in step with this editor, both ways —
+              edit it in VS Code or nvim and the chart follows; drag a bar and the file is rewritten.
+            </p>
+          </div>
+          <div id="linkOn" hidden>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span class="lkdot" id="lkDot"></span>
+              <strong id="lkName" style="font-size:12.5px"></strong>
+              <span class="note" id="lkState"></span>
+              <span class="spacer"></span>
+              <button class="mini" id="linkOff">Unlink</button>
+            </div>
+            <div id="lkConflict" hidden style="margin-top:9px">
+              <div class="warn" style="margin-bottom:6px">
+                Changed here and on disk since the last sync. Pick one — the other is discarded.</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="mini" id="takeDisk">Use the file</button>
+                <button class="mini" id="takeMine">Use what's here</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="note" style="margin:8px 0 0">
+          <code># Phase</code> · <code>Task | 2026-09-14 | 3w</code> ·
+          <code>! Milestone | 2027-01-21</code><br>
+          extras after the dates, any order: <code>60%</code> progress,
+          <code>@id</code> name it, <code>&gt;id,id2</code> depends on.
+          <code>//</code> comment, <code>%title …</code> heading.
+        </p>
+      </section>
+
+      <section class="card" id="inspector" hidden>
+        <h2>Selected row</h2>
+        <div class="grid2">
+          <div style="grid-column:1/-1"><label for="iName">Name</label>
+            <input type="text" id="iName"></div>
+          <div><label for="iStart">Start</label>
+            <input type="text" id="iStart" class="dateIn" placeholder="YYYY-MM-DD"
+                   inputmode="numeric" autocomplete="off" spellcheck="false"></div>
+          <div><label for="iEnd">End</label>
+            <input type="text" id="iEnd" class="dateIn" placeholder="YYYY-MM-DD"
+                   inputmode="numeric" autocomplete="off" spellcheck="false"></div>
+          <div><label for="iProg">Progress %</label>
+            <input type="number" id="iProg" min="0" max="100" step="5"></div>
+          <div><label for="iId">Id</label><input type="text" id="iId" placeholder="none"></div>
+          <div style="grid-column:1/-1"><label for="iDeps">Depends on (comma-separated ids)</label>
+            <input type="text" id="iDeps" placeholder="none"></div>
+          <div style="grid-column:1/-1"><label for="iNote">Description (appears on the notes page)</label>
+            <textarea id="iNote" rows="3" placeholder="none"></textarea></div>
+          <div style="grid-column:1/-1"><label for="iColor">Colour for this row</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="color" id="iColor">
+              <button class="mini" id="clrColor">Use default</button>
+              <span class="note" id="colState"></span>
+            </div></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
+          <button class="mini" id="upBtn" title="Move row up">↑</button>
+          <button class="mini" id="downBtn" title="Move row down">↓</button>
+          <button class="mini" id="dupBtn">Duplicate</button>
+          <button class="mini" id="delBtn">Delete</button>
+          <button class="mini" id="linkBtn" title="Click this bar, then another, to link them">Link from…</button>
+        </div>
+        <p class="note" style="margin:8px 0 0">
+          Drag a bar to move it, drag its edges to resize. <kbd>Shift</kbd> while
+          dragging for single-day steps, <kbd>←</kbd><kbd>→</kbd> to nudge, <kbd>Esc</kbd> to deselect.
+        </p>
+      </section>
+
+      <section>
+        <h2>Add</h2>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mini" id="addTask">+ Task</button>
+          <button class="mini" id="addPhase">+ Phase</button>
+          <button class="mini" id="addMs">+ Milestone</button>
+        </div>
+        <p class="note" style="margin:7px 0 0" id="addWhere"></p>
+      </section>
+
+      <section>
+        <h2>Page</h2>
+        <div class="grid2">
+          <div><label for="orient">Orientation</label>
+            <select id="orient">
+              <option value="landscape">A4 landscape</option>
+              <option value="portrait">A4 portrait</option>
+            </select></div>
+          <div><label for="unit">Time unit</label>
+            <select id="unit">
+              <option value="w">Weeks</option>
+              <option value="d">Days</option>
+              <option value="m">Months</option>
+            </select></div>
+          <div><label for="margin">Margin (mm)</label>
+            <input type="number" id="margin" min="5" max="30" step="1"></div>
+          <div><label for="rowH">Row height (mm)</label>
+            <input type="number" id="rowH" min="3" max="12" step="0.5"></div>
+          <div><label for="labelW">Label column (mm)</label>
+            <input type="number" id="labelW" min="25" max="120" step="1"></div>
+          <div><label for="fs">Font size (pt)</label>
+            <input type="number" id="fs" min="4" max="12" step="0.5"></div>
+          <div><label for="maxCols">Max columns / page</label>
+            <input type="number" id="maxCols" min="0" max="400" step="1" title="0 = never split the timeline"></div>
+          <div><label for="face">Typeface</label>
+            <select id="face">
+              <option value="sans">Sans</option>
+              <option value="serif">Serif (matches LaTeX body)</option>
+              <option value="mono">Mono</option>
+            </select></div>
+          <div><label for="zoom">Preview zoom</label>
+            <select id="zoom">
+              <option value="fit">Fit width</option>
+              <option value="0.5">50%</option>
+              <option value="0.75">75%</option>
+              <option value="1">100%</option>
+              <option value="1.5">150%</option>
+            </select></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Colours</h2>
+        <div class="swatches">
+          <label for="kTask"><input type="color" id="kTask"> Task bars</label>
+          <label for="kPhase"><input type="color" id="kPhase"> Phase bars</label>
+          <label for="kMs"><input type="color" id="kMs"> Milestones</label>
+          <label for="kToday"><input type="color" id="kToday"> Today line</label>
+        </div>
+        <p class="note" style="margin:8px 0 0" id="colourNote"></p>
+      </section>
+
+      <section>
+        <h2>Chart</h2>
+        <div class="checks">
+          <label><input type="checkbox" id="cDates"> Start / end date columns</label>
+          <label><input type="checkbox" id="cArrows"> Dependency arrows</label>
+          <label><input type="checkbox" id="cGroups"> Phase summary bars</label>
+          <label><input type="checkbox" id="cProg"> Progress shading</label>
+          <label><input type="checkbox" id="cNotes"> Notes page for ~ descriptions</label>
+          <label><input type="checkbox" id="cPWeek"> Project week numbers (01, 02, …)</label>
+          <label><input type="checkbox" id="cToday"> Today marker</label>
+          <label><input type="checkbox" id="cColor"> Colour by phase (overrides task colour)</label>
+          <label><input type="checkbox" id="cZebra"> Alternating row bands</label>
+          <label><input type="checkbox" id="cLegend"> Footer line</label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Reset</h2>
+        <button class="mini" id="seedBtn">Reload the example plan</button>
+      </section>
+
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="bar">
+      <button class="primary" id="printBtn">Print / Save as PDF</button>
+      <span class="note" id="fit"></span>
+      <span class="spacer"></span>
+      <span class="note" id="stats"></span>
+    </div>
+    <div class="preview" id="preview"></div>
+  </div>
+
+</div>
+<script>
+"use strict";
+
+/* ========================= dates ========================= */
+const DAY = 86400000;
+function d2s(d){ return d.toISOString().slice(0,10); }
+function s2d(s){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s); if(!m) return null;
+  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],12,0,0));
+  return (d.getUTCFullYear()==+m[1] && d.getUTCMonth()==+m[2]-1 && d.getUTCDate()==+m[3]) ? d : null; }
+function addDays(d,n){ return new Date(d.getTime()+n*DAY); }
+function diffDays(a,b){ return Math.round((a-b)/DAY); }
+function mondayOf(d){ const w=(d.getUTCDay()+6)%7; return addDays(d,-w); }
+function firstOfMonth(d){ return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1,12)); }
+function addMonths(d,n){ return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,1,12)); }
+function isoWeek(d){
+  const t=new Date(d.getTime()); const dn=(t.getUTCDay()+6)%7;
+  t.setUTCDate(t.getUTCDate()-dn+3);
+  const y=t.getUTCFullYear(); const jan4=new Date(Date.UTC(y,0,4,12));
+  const jn=(jan4.getUTCDay()+6)%7; const w1=addDays(jan4,-jn);
+  return { w: Math.floor(diffDays(t,w1)/7)+1, y };
+}
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/* ========================= parse / serialize ========================= */
+const RX_DATE=/^\d{4}-\d{2}-\d{2}$/;
+const RX_DUR=/^(\d+(?:\.\d+)?)\s*([dwm])$/i;
+const RX_PCT=/^(\d{1,3})\s*%$/;
+const RX_ID=/^@([A-Za-z0-9_-]+)$/;
+const RX_DEP=/^>\s*([A-Za-z0-9_,\s-]+)$/;
+const RX_HEX=/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+function parse(text){
+  const items=[], errs=[];
+  text.split(/\r?\n/).forEach((raw,i)=>{
+    const ln=i+1, s=raw.trim();
+    if(s===""||s.startsWith("//")){ items.push({kind:"raw",raw}); return; }
+    if(s.startsWith("~")){
+      const t=s.slice(1).trim();
+      let owner=null;
+      for(let k=items.length-1;k>=0;k--){ const it=items[k];
+        if(it.kind==="task"||it.kind==="ms"||it.kind==="phase"){ owner=it; break; }
+        if(it.kind!=="raw") break; }
+      if(!owner){ errs.push(`line ${ln}: a ~ description must follow a task, milestone or phase`);
+        items.push({kind:"raw",raw}); return; }
+      if(!t){ items.push({kind:"raw",raw}); return; }
+      owner.note = owner.note ? owner.note+" "+t : t;
+      return;                                   // folded into its row, not a line of its own
+    }
+    if(s.startsWith("%")){
+      const m=/^%\s*([A-Za-z]+)\s*(.*)$/.exec(s);
+      if(!m){ errs.push(`line ${ln}: directive needs a name, e.g. %title My plan`); items.push({kind:"raw",raw}); return; }
+      items.push({kind:"dir",key:m[1].toLowerCase(),val:m[2].trim()}); return;
+    }
+    if(s.startsWith("#")){
+      const seg=s.replace(/^#+\s*/,"").split("|").map(x=>x.trim());
+      const n=seg[0];
+      if(!n){ errs.push(`line ${ln}: phase has no name`); items.push({kind:"raw",raw}); return; }
+      let pc=null;
+      if(seg[1]){ if(RX_HEX.test(seg[1])) pc=seg[1].toLowerCase();
+        else errs.push(`line ${ln}: "${seg[1]}" is not a colour — use #2f6f9f`); }
+      items.push({kind:"phase",name:n,color:pc,note:null}); return; }
+
+    const ms=s.startsWith("!");
+    const parts=(ms?s.slice(1):s).split("|").map(x=>x.trim());
+    const name=parts[0];
+    if(!name){ errs.push(`line ${ln}: row has no name`); items.push({kind:"raw",raw}); return; }
+
+    const it={kind:ms?"ms":"task",name,prog:null,id:null,deps:[],color:null,note:null};
+    const rest=parts.slice(1);
+    const opts=[];
+
+    // first value is always the start date
+    if(!rest.length){ errs.push(`line ${ln}: "${name}" needs a date — ${ms?'! Name | 2026-10-01':'Name | 2026-10-01 | 3w'}`);
+      items.push({kind:"raw",raw}); return; }
+    const sd=s2d(rest[0]);
+    if(!sd){ errs.push(`line ${ln}: "${rest[0]}" is not a date (use YYYY-MM-DD)`); items.push({kind:"raw",raw}); return; }
+    it.start=sd;
+
+    if(ms){ opts.push(...rest.slice(1)); }
+    else{
+      const second=rest[1];
+      if(second===undefined||second===""){ errs.push(`line ${ln}: "${name}" needs an end date or a duration like 3w`);
+        items.push({kind:"raw",raw}); return; }
+      if(RX_DATE.test(second)){
+        const ed=s2d(second);
+        if(!ed){ errs.push(`line ${ln}: "${second}" is not a valid date`); items.push({kind:"raw",raw}); return; }
+        if(ed<sd){ errs.push(`line ${ln}: "${name}" ends before it starts`); items.push({kind:"raw",raw}); return; }
+        it.end=ed; it.durForm=null;
+      } else {
+        const m=RX_DUR.exec(second);
+        if(!m){ errs.push(`line ${ln}: "${second}" is neither a date nor a duration (3w, 10d, 2m)`);
+          items.push({kind:"raw",raw}); return; }
+        const n=parseFloat(m[1]), u=m[2].toLowerCase();
+        if(n<=0){ errs.push(`line ${ln}: duration must be greater than zero`); items.push({kind:"raw",raw}); return; }
+        it.durForm=u;
+        it.end = u==="d" ? addDays(sd,Math.round(n)-1)
+               : u==="w" ? addDays(sd,Math.round(n*7)-1)
+               : addDays(addMonths(firstOfMonth(sd),Math.round(n)),-1);
+        if(u==="m") it.end=addDays(addMonths(sd,Math.round(n)),-1);
+      }
+      opts.push(...rest.slice(2));
+    }
+
+    opts.forEach(o=>{
+      if(o==="") return;
+      let m;
+      if((m=RX_PCT.exec(o))){ it.prog=Math.max(0,Math.min(100,+m[1])); }
+      else if((m=RX_ID.exec(o))){ it.id=m[1]; }
+      else if((m=RX_DEP.exec(o))){ it.deps=m[1].split(",").map(x=>x.trim()).filter(Boolean); }
+      else if(RX_HEX.test(o)){ it.color=o.toLowerCase(); }
+      else errs.push(`line ${ln}: don't understand "${o}" — expected 60%, @id, >id or #2f6f9f`);
+    });
+    items.push(it);
+  });
+
+  // duplicate / dangling ids
+  const seen=new Map();
+  items.forEach(it=>{ if(it.id){ if(seen.has(it.id)) errs.push(`id "${it.id}" is used more than once`); else seen.set(it.id,it); } });
+  items.forEach(it=>{ (it.deps||[]).forEach(d=>{ if(!seen.has(d)) errs.push(`"${it.name}" depends on "${d}", which no row defines (add @${d})`); }); });
+
+  return {items,errs};
+}
+
+function durText(it){
+  const days=diffDays(it.end,it.start)+1;
+  if(it.durForm==="w" && days%7===0) return (days/7)+"w";
+  if(it.durForm==="d") return days+"d";
+  if(it.durForm==="m"){ let n=1; while(n<60){ if(diffDays(addDays(addMonths(it.start,n),-1),it.end)===0) return n+"m"; n++; } }
+  if(it.durForm==="w") return (days/7).toFixed(1).replace(/\.0$/,"")+"w";
+  return d2s(it.end);
+}
+function optText(it){
+  let o="";
+  if(it.prog!==null&&it.prog!==undefined) o+=" | "+it.prog+"%";
+  if(it.id) o+=" | @"+it.id;
+  if(it.deps&&it.deps.length) o+=" | >"+it.deps.join(",");
+  if(it.color) o+=" | "+it.color;
+  return o;
+}
+function noteLines(it,width){
+  if(!it.note) return "";
+  const words=it.note.split(/\s+/); const out=[]; let cur="~";
+  words.forEach(w=>{ if((cur+" "+w).length>width&&cur!=="~"){ out.push(cur); cur="~ "+w; }
+                     else cur+=" "+w; });
+  out.push(cur);
+  return "\n"+out.join("\n");
+}
+function serialize(items){
+  const rows=items.filter(i=>i.kind==="task"||i.kind==="ms");
+  const nw=Math.max(0,...rows.map(i=>(i.kind==="ms"?2:0)+i.name.length));
+  const dw=Math.max(10,...rows.filter(i=>i.kind==="task").map(i=>durText(i).length));
+  return items.map(it=>{
+    if(it.kind==="raw") return it.raw;
+    if(it.kind==="dir") return "%"+it.key+" "+it.val;
+    if(it.kind==="phase") return "\n# "+it.name+(it.color?" | "+it.color:"")+noteLines(it,96);
+    const head=(it.kind==="ms"?"! ":"")+it.name;
+    const pad=head.padEnd(nw+(it.kind==="ms"?0:2));
+    if(it.kind==="ms") return pad+" | "+d2s(it.start)+optText(it)+noteLines(it,96);
+    return pad+" | "+d2s(it.start)+" | "+durText(it).padEnd(dw)+optText(it)+noteLines(it,96);
+  }).join("\n").replace(/\n{3,}/g,"\n\n").replace(/^\n+/,"");
+}
+
+/* ========================= geometry ========================= */
+const FACE={sans:'-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif',
+  serif:'"Latin Modern Roman","Computer Modern Serif",Cambria,"Times New Roman",Times,serif',
+  mono:'ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace'};
+const PAL=["#2f6f9f","#4e8c57","#96703a","#7a5d96","#9e5250","#3c8686","#7d7b3c"];
+const GRP="#5c6773", MSC="#8a6d1f";
+
+function model(items,opt){
+  const rows=[]; let phase=-1;
+  items.forEach(it=>{
+    if(it.kind==="phase"){ phase++; rows.push({...it,phase,ref:it}); }
+    else if(it.kind==="task"||it.kind==="ms") rows.push({...it,phase,ref:it});
+  });
+  let curPh=null;
+  rows.forEach(r=>{ if(r.kind==="phase") curPh=r; else r.phRow=curPh; });
+  const dated=rows.filter(r=>r.kind!=="phase");
+  if(!dated.length) return null;
+  let lo=dated[0].start, hi=dated[0].end||dated[0].start;
+  dated.forEach(r=>{ if(r.start<lo) lo=r.start; const e=r.end||r.start; if(e>hi) hi=e; });
+
+  // phase spans from their children
+  rows.forEach((r,i)=>{ if(r.kind!=="phase") return;
+    let a=null,b=null;
+    for(let j=i+1;j<rows.length&&rows[j].kind!=="phase";j++){
+      const c=rows[j]; const ce=c.end||c.start;
+      if(!a||c.start<a) a=c.start; if(!b||ce>b) b=ce;
+    }
+    r.start=a; r.end=b;
+  });
+
+  const u=opt.unit;
+  let axis, cols, pos, colStart;
+  if(u==="m"){
+    axis=firstOfMonth(lo);
+    const hiM=firstOfMonth(hi);
+    cols=(hiM.getUTCFullYear()-axis.getUTCFullYear())*12+(hiM.getUTCMonth()-axis.getUTCMonth())+1;
+    colStart=c=>addMonths(axis,c);
+    pos=d=>{ const n=(d.getUTCFullYear()-axis.getUTCFullYear())*12+(d.getUTCMonth()-axis.getUTCMonth());
+      const dim=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0,12)).getUTCDate();
+      return n+(d.getUTCDate()-1)/dim; };
+  } else {
+    const step=u==="w"?7:1;
+    axis=u==="w"?mondayOf(lo):lo;
+    const last=u==="w"?addDays(mondayOf(hi),6):hi;
+    cols=Math.round((diffDays(last,axis)+1)/step);
+    colStart=c=>addDays(axis,c*step);
+    pos=d=>diffDays(d,axis)/step;
+  }
+  const meta=items.filter(i=>i.kind==="dir").reduce((a,d)=>(a[d.key]=d.val,a),{});
+  return {rows,axis,cols,pos,colStart,unit:u,lo,hi,meta,
+          ids:new Map(rows.filter(r=>r.id).map(r=>[r.id,r]))};
+}
+
+function mm(v){ return (Math.round(v*1000)/1000)+"mm"; }
+function el(cls,st,txt){ const d=document.createElement("div"); if(cls)d.className=cls;
+  if(st) for(const k in st){                    // Object.assign silently drops --custom props
+    if(k.charCodeAt(0)===45&&k.charCodeAt(1)===45) d.style.setProperty(k,st[k]);
+    else d.style[k]=st[k];
+  }
+  if(txt!==undefined)d.textContent=txt; return d; }
+
+/* ========================= render ========================= */
+function render(M,opt,host){
+  host.textContent="";
+  if(!M){ host.appendChild(el("note",{padding:"40px"},"Nothing dated yet — add a task with a start date.")); return {pages:0,colW:0}; }
+
+  const land=opt.orient==="landscape";
+  const PW=land?297:210, PH=land?210:297, mg=opt.margin;
+  const cW=PW-2*mg, cH=PH-2*mg;
+  const title=M.meta.title||"", sub=M.meta.subtitle||"";
+  const titleH=(title?opt.fs*0.353*1.9+1.5:0)+(sub?opt.fs*0.353*1.5+1:0)+(title||sub?2.5:0);
+  const footH=opt.legend?5:0;
+  const bandH=Math.max(3.6,opt.rowH*0.92), headH=bandH*2;
+  const chartH=cH-titleH-footH;
+  const availH=chartH-headH-0.8;
+  const rowsPP=Math.max(1,Math.floor(availH/opt.rowH));
+
+  const dateW=opt.dates?15:0;
+  const tlX=opt.labelW+dateW*2;
+  const tlW=cW-tlX;
+  const colsPP=opt.maxCols>0?Math.min(opt.maxCols,M.cols):M.cols;
+  const colW=tlW/colsPP;
+
+  const noteNo=new Map();
+  if(opt.notes) M.rows.forEach(r=>{ if(r.note) noteNo.set(r,noteNo.size+1); });
+  const vSlices=Math.ceil(M.rows.length/rowsPP);
+  const hSlices=Math.ceil(M.cols/colsPP);
+  const fpt=opt.fs+"pt", fptS=(opt.fs*0.86)+"pt";
+
+  for(let h=0;h<hSlices;h++){
+    const c0=h*colsPP, c1=Math.min(M.cols,c0+colsPP);
+    for(let v=0;v<vSlices;v++){
+      const r0=v*rowsPP, r1=Math.min(M.rows.length,r0+rowsPP);
+      const wrap=el("pagewrap"), page=el("page",{width:mm(PW),height:mm(PH)});
+      const sheet=el("sheet",{padding:mm(mg),fontSize:fpt,fontFamily:FACE[opt.face]||FACE.sans});
+      page.appendChild(sheet); wrap.appendChild(page); host.appendChild(wrap);
+      const inner=el("",{position:"absolute",left:mm(mg),top:mm(mg),width:mm(cW),height:mm(cH)});
+      sheet.appendChild(inner);
+
+      let y=0;
+      if(title){ const t=el("s-title",{left:"0",top:mm(y),width:mm(cW),fontSize:(opt.fs*1.45)+"pt"},
+          title+(hSlices>1?`  (${c0+1}–${c1} of ${M.cols})`:"")); inner.appendChild(t); y+=opt.fs*0.353*1.9+1.5; }
+      if(sub){ const t=el("s-sub",{left:"0",top:mm(y),width:mm(cW),fontSize:fptS},sub);
+        inner.appendChild(t); y+=opt.fs*0.353*1.5+1; }
+      if(title||sub) y+=2.5;
+
+      const chart=el("chart",{left:"0",top:mm(y),width:mm(cW),height:mm(chartH)});
+      chart.__geo={tlX,colW,c0,c1};
+      inner.appendChild(chart);
+      const nRows=r1-r0, bodyH=nRows*opt.rowH, botY=headH+bodyH;
+
+      /* --- header bands --- */
+      const X=c=>tlX+(c-c0)*colW;
+      if(M.unit==="m"){
+        let c=c0; while(c<c1){ const yr=M.colStart(c).getUTCFullYear(); let e=c;
+          while(e<c1&&M.colStart(e).getUTCFullYear()===yr) e++;
+          chart.appendChild(el("hcell mo",{left:mm(X(c)),top:"0",width:mm((e-c)*colW),height:mm(bandH),fontSize:fptS},String(yr)));
+          c=e; }
+        for(let i=c0;i<c1;i++) chart.appendChild(el("hcell wk",
+          {left:mm(X(i)),top:mm(bandH),width:mm(colW),height:mm(bandH),fontSize:fptS},
+          MON[M.colStart(i).getUTCMonth()]));
+      } else {
+        let c=c0; while(c<c1){ const d0=M.colStart(c), key=d0.getUTCFullYear()*12+d0.getUTCMonth(); let e=c;
+          while(e<c1){ const d=M.colStart(e); if(d.getUTCFullYear()*12+d.getUTCMonth()!==key) break; e++; }
+          const wide=(e-c)*colW;
+          chart.appendChild(el("hcell mo",{left:mm(X(c)),top:"0",width:mm(wide),height:mm(bandH),fontSize:fptS},
+            wide>16?MON[d0.getUTCMonth()]+" "+d0.getUTCFullYear():wide>7?MON[d0.getUTCMonth()]:MON[d0.getUTCMonth()][0]));
+          c=e; }
+        for(let i=c0;i<c1;i++){ const d=M.colStart(i);
+          const lab=M.unit==="w"?String(isoWeek(d).w):String(d.getUTCDate());
+          const c=el("hcell wk",{left:mm(X(i)),top:mm(bandH),width:mm(colW),height:mm(bandH),fontSize:fptS},lab);
+          if(opt.pweek&&M.unit==="w"&&colW>6)
+            c.appendChild(el("pw",{fontSize:(opt.fs*0.62)+"pt"},String(i+1).padStart(2,"0")));
+          chart.appendChild(c); }
+      }
+      if(M.unit==="w"){
+        const g=el("hcell wk",{left:"0",top:mm(bandH),width:mm(opt.labelW-1),height:mm(bandH),
+          fontSize:fptS,justifyContent:"flex-end",borderLeft:"0",color:"#888"},
+          opt.pweek?"KW / week":"KW");
+        chart.appendChild(g);
+      }
+      if(opt.dates){
+        chart.appendChild(el("hcell wk",{left:mm(opt.labelW),top:mm(bandH),width:mm(dateW),height:mm(bandH),fontSize:fptS,borderLeft:"0"},"start"));
+        chart.appendChild(el("hcell wk",{left:mm(opt.labelW+dateW),top:mm(bandH),width:mm(dateW),height:mm(bandH),fontSize:fptS,borderLeft:"0"},"end"));
+      }
+      chart.appendChild(el("hline",{top:mm(headH),width:mm(cW),height:"0.25mm"}));
+      chart.appendChild(el("hline",{top:mm(botY),width:mm(cW),height:"0.25mm",background:"#c3c9cf"}));
+
+      /* --- grid --- */
+      for(let i=c0;i<=c1;i++){
+        const isMo=i===c0||i===c1||(M.unit==="m"
+          ? M.colStart(i).getUTCMonth()===0
+          : M.colStart(i).getUTCDate()<=(M.unit==="w"?7:1));
+        chart.appendChild(el("gl"+(isMo?" mo":""),
+          {left:mm(X(i)),top:mm(headH),width:isMo?"0.25mm":"0.15mm",height:mm(bodyH)}));
+      }
+
+      /* --- rows --- */
+      for(let i=r0;i<r1;i++){
+        const r=M.rows[i], k=i-r0, ry=headH+k*opt.rowH;
+        if(r.kind==="phase") chart.appendChild(el("phfill",{top:mm(ry),width:mm(cW),height:mm(opt.rowH)}));
+        else if(opt.zebra&&k%2===1) chart.appendChild(el("rowfill",{top:mm(ry),width:mm(cW),height:mm(opt.rowH)}));
+        chart.appendChild(el("gl hz",{top:mm(ry),width:mm(cW),height:"0.1mm"}));
+        const hitr=el("rowhit",{top:mm(ry),width:mm(cW),height:mm(opt.rowH)});
+        hitr.dataset.row=i; chart.appendChild(hitr);
+        if(i===selIdx) chart.appendChild(el("rowsel",{top:mm(ry),width:mm(cW),height:mm(opt.rowH)}));
+
+        const ind=r.kind==="phase"?0:2.2;
+        const lb=el("lbl"+(r.kind==="phase"?" ph":r.kind==="ms"?" ms":""),
+          {left:mm(ind),top:mm(ry),width:mm(opt.labelW-ind-1.5),height:mm(opt.rowH),fontSize:fpt},r.name);
+        lb.dataset.row=i;
+        if(noteNo.has(r)){
+          const a=document.createElement("a");
+          a.className="nmark"; a.href="#gnote"+noteNo.get(r);
+          a.textContent=noteNo.get(r); a.title=r.note;
+          lb.appendChild(a);
+        }
+        if(r.note) lb.title=r.note;
+        chart.appendChild(lb);
+
+        if(opt.dates&&r.start){
+          chart.appendChild(el("dcell",{left:mm(opt.labelW),top:mm(ry),width:mm(dateW-1),height:mm(opt.rowH),fontSize:fptS},d2s(r.start).slice(2)));
+          if(r.kind!=="ms") chart.appendChild(el("dcell",{left:mm(opt.labelW+dateW),top:mm(ry),width:mm(dateW-1),height:mm(opt.rowH),fontSize:fptS},d2s(r.end).slice(2)));
+        }
+
+        if(!r.start) continue;
+        const pad=Math.max(0.35,opt.rowH*0.17);
+        const ph=r.kind==="phase"?r:r.phRow;
+        const phC=(ph&&ph.color)||(r.phase>=0?PAL[r.phase%PAL.length]:PAL[0]);
+        const col=r.color||(opt.colour?phC:opt.cTask);
+
+        if(r.kind==="ms"){
+          const half=M.unit==="m"?0:(0.5/(M.unit==="w"?7:1));
+          const cx=tlX+(M.pos(r.start)+half-c0)*colW, sz=Math.min(opt.rowH*0.66,colW*1.1);
+          if(cx>=tlX-sz&&cx<=tlX+tlW+sz){
+            const d=el("ms2"+(i===selIdx?" sel":""),{left:mm(cx-sz/2),top:mm(ry+(opt.rowH-sz)/2),
+              width:mm(sz),height:mm(sz),"--c":r.color||opt.cMs});
+            d.dataset.row=i; chart.appendChild(d);
+          }
+        } else {
+          const a=M.pos(r.start), b=M.pos(addDays(r.end,1));
+          const x0=Math.max(c0,a), x1=Math.min(c1,b);
+          if(x1>x0){
+            const L=tlX+(x0-c0)*colW, W=Math.max(0.7,(x1-x0)*colW);
+            if(r.kind==="phase"){
+              if(opt.groups){
+                const gh=Math.max(0.6,opt.rowH*0.2);
+                const g=el("grp",{left:mm(L),top:mm(ry+opt.rowH*0.36),width:mm(W),height:mm(gh),
+                                  background:r.color||opt.cPhase});
+                g.dataset.row=i; chart.appendChild(g);
+                [[L,-1],[L+W,1]].forEach(([px,dir],n)=>{
+                  if((n===0&&a<c0)||(n===1&&b>c1)) return;
+                  const t=el("",{position:"absolute",top:mm(ry+opt.rowH*0.36),
+                    left:mm(px),width:0,height:0,borderStyle:"solid",
+                    borderWidth:mm(1.5)+" "+mm(1.1)+" 0 0",
+                    borderColor:(r.color||opt.cPhase)+" transparent transparent transparent",
+                    transform:dir<0?"none":"scaleX(-1)",transformOrigin:"left top"});
+                  chart.appendChild(t);
+                });
+              }
+            } else {
+              const bar=el("bar2"+(i===selIdx?" sel":""),
+                {left:mm(L),top:mm(ry+pad),width:mm(W),height:mm(opt.rowH-2*pad),"--c":col});
+              bar.dataset.row=i;
+              if(opt.prog&&r.prog){ const p=el("prog"); p.style.width=(r.prog)+"%"; bar.appendChild(p); }
+              bar.appendChild(el("hl")); bar.appendChild(el("hr"));
+              chart.appendChild(bar);
+              if(opt.prog&&r.prog&&W>7)
+                chart.appendChild(el("pctxt",{left:mm(L+W+(opt.arrows?2.4:1)),top:mm(ry),
+                  height:mm(opt.rowH),fontSize:fptS},r.prog+"%"));
+            }
+          }
+        }
+      }
+
+      /* --- arrows --- */
+      if(opt.arrows){
+        const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+        svg.setAttribute("class","arrows"); svg.setAttribute("width",mm(cW)); svg.setAttribute("height",mm(chartH));
+        svg.setAttribute("viewBox",`0 0 ${cW} ${chartH}`);
+        const idx=new Map(M.rows.map((r,i)=>[r,i]));
+        M.rows.forEach((r,i)=>{ if(i<r0||i>=r1||!r.deps||!r.deps.length||!r.start) return;
+          r.deps.forEach(dep=>{ const p=M.ids.get(dep); if(!p||!p.start) return;
+            const pi=idx.get(p); if(pi<r0||pi>=r1) return;
+            const pe=M.pos(addDays(p.end||p.start,1)), rs=M.pos(r.start);
+            let x1=tlX+(pe-c0)*colW, x2=tlX+(rs-c0)*colW;
+            if(p.kind==="ms"){ const half=M.unit==="m"?0:(0.5/(M.unit==="w"?7:1)); x1=tlX+(M.pos(p.start)+half-c0)*colW; }
+            const y1=headH+(pi-r0)*opt.rowH+opt.rowH/2, y2=headH+(i-r0)*opt.rowH+opt.rowH/2;
+            if(x1<tlX-2||x1>tlX+tlW+2||x2<tlX-2||x2>tlX+tlW+2) return;
+            const g=1.6, d=(x2-x1>=g*2)
+              ? `M${x1} ${y1} H${x1+g} V${y2} H${x2-0.9}`
+              : `M${x1} ${y1} H${x1+g} V${y1+(y2>y1?1:-1)*opt.rowH*0.5} H${x2-g*1.6} V${y2} H${x2-0.9}`;
+            const p1=document.createElementNS("http://www.w3.org/2000/svg","path");
+            p1.setAttribute("d",d); p1.setAttribute("fill","none");
+            p1.setAttribute("stroke","#7b858f"); p1.setAttribute("stroke-width","0.22");
+            svg.appendChild(p1);
+            const a=document.createElementNS("http://www.w3.org/2000/svg","path");
+            a.setAttribute("d",`M${x2} ${y2} l-1.1 -0.62 l0 1.24 z`);
+            a.setAttribute("fill","#7b858f"); svg.appendChild(a);
+          });
+        });
+        chart.appendChild(svg);
+      }
+
+      /* --- today --- */
+      if(opt.today){
+        const t=new Date(); const td=s2d(d2s(t));
+        if(td>=M.axis){ const p=M.pos(td);
+          if(p>=c0&&p<=c1){ const x=tlX+(p-c0)*colW;
+            chart.appendChild(el("today",{left:mm(x),top:mm(bandH),width:"0.3mm",
+              height:mm(botY-bandH),background:opt.cToday}));
+          } }
+      }
+
+      if(opt.legend){
+        const f=el("s-foot",{left:"0",top:mm(cH-footH+1),width:mm(cW),fontSize:fptS});
+        const L=el("legend");
+        const mk=(c,t,dm)=>{ const i=document.createElement("i");
+          i.style.background=c;
+          i.style.width=mm(dm==="v"?0.35:dm?3:5); i.style.height=mm(dm==="v"?3.2:dm?3:1.6);
+          if(dm===1) i.style.clipPath="polygon(50% 0,100% 50%,50% 100%,0 50%)";
+          const w=el("",{display:"inline-flex",alignItems:"center",gap:mm(1)}); w.appendChild(i);
+          w.appendChild(el("",{},t)); return w; };
+        if(!opt.colour) L.appendChild(mk(opt.cTask,"task"));
+        if(opt.groups) L.appendChild(mk(opt.cPhase,"phase"));
+        L.appendChild(mk(opt.cMs,"milestone",1));
+        if(opt.today) L.appendChild(mk(opt.cToday,"today","v"));
+        L.appendChild(el("",{marginLeft:"auto"},
+          `${d2s(M.lo)} – ${d2s(M.hi)}  ·  ${M.cols} ${M.unit==="w"?"weeks":M.unit==="d"?"days":"months"}`
+          + (vSlices*hSlices>1?`  ·  page ${h*vSlices+v+1}/${vSlices*hSlices}`:"")));
+        L.style.width=mm(cW); f.appendChild(L); inner.appendChild(f);
+      }
+    }
+  }
+
+  /* ---- notes page(s) ---- */
+  if(opt.notes&&noteNo.size){
+    const face=FACE[opt.face]||FACE.sans;
+    const probe=el("",{position:"absolute",visibility:"hidden",left:"-9999mm",top:"0",
+      width:mm(cW),fontSize:fpt,fontFamily:face});
+    document.body.appendChild(probe);
+    const entries=[];
+    noteNo.forEach((n,r)=>{
+      const d=el("nitem");
+      d.appendChild(el("nnum",{},String(n)));
+      const body=el("nbody");
+      const nm=document.createElement("b"); nm.textContent=r.name; body.appendChild(nm);
+      if(r.start){ const sp=el("nwhen",{},"  "+d2s(r.start)+(r.kind==="ms"||!r.end?"":" – "+d2s(r.end)));
+        body.appendChild(sp); }
+      body.appendChild(el("ntext",{},r.note));
+      d.appendChild(body);
+      probe.appendChild(d);
+      entries.push({n,el:d,h:d.getBoundingClientRect().height/PXMM});
+    });
+    probe.remove();
+
+    const headH2=opt.fs*0.353*1.9+3;
+    let k=0;
+    while(k<entries.length){
+      const wrap=el("pagewrap"), page=el("page",{width:mm(PW),height:mm(PH)});
+      const sheet=el("sheet",{padding:mm(mg),fontSize:fpt,fontFamily:face});
+      page.appendChild(sheet); wrap.appendChild(page); host.appendChild(wrap);
+      const inner=el("",{position:"absolute",left:mm(mg),top:mm(mg),width:mm(cW),height:mm(cH)});
+      sheet.appendChild(inner);
+      let yy=0;
+      if(k===0){ inner.appendChild(el("s-title",{left:"0",top:"0",width:mm(cW),
+        fontSize:(opt.fs*1.45)+"pt"},M.meta.notestitle||"Notes")); yy=headH2; }
+      const box=el("notes",{left:"0",top:mm(yy),width:mm(cW)});
+      inner.appendChild(box);
+      let used=yy;
+      while(k<entries.length&&(used+entries[k].h<=cH-footH||used===yy)){
+        const e=entries[k];
+        e.el.id="gnote"+e.n;
+        box.appendChild(e.el); used+=e.h; k++;
+      }
+      if(opt.legend) inner.appendChild(el("s-foot",{left:"0",top:mm(cH-footH+1),
+        width:mm(cW),fontSize:fptS,textAlign:"right"},M.meta.title||""));
+    }
+  }
+
+  return {pages:vSlices*hSlices,colW,rowsPP,vSlices,hSlices,notes:noteNo.size};
+}
+
+/* ========================= state ========================= */
+let selIdx=-1, ITEMS=[], M=null, LAST=null, linkFrom=-1, PXMM=3.7795;
+const $=id=>document.getElementById(id);
+
+const SEED=`%title Example plan — weather station build
+%subtitle Replace this with your own plan. The Reset panel reloads this example.
+%notestitle Notes
+
+// Lines that start with // are comments. They survive a round trip.
+// A task is "Name | start | end-or-duration". A milestone is "! Name | date".
+// A phase is "# Name". After the dates, in any order: 60% progress,
+// @id to name a row, >id to make it depend on another row, #rrggbb to recolour it.
+
+Weekly review                        | 2026-09-14 | 19w
+
+# Planning
+Decide what to measure               | 2026-09-14 | 2w  | 100% | @scope
+Compare sensor datasheets            | 2026-09-21 | 2w  | 80%  | @parts | >scope
+Draft the enclosure                  | 2026-09-28 | 2w  | 40%  | @encl  | >scope
+~ A description starts with ~ and belongs to the row above it. Several ~ lines
+~ join into one paragraph. Switch on the notes page and each description becomes a
+~ numbered entry, with a superscript link from the row label to the entry.
+! Parts ordered                      | 2026-10-09 | >parts
+
+# Build
+Breadboard the sensor bus            | 2026-10-12 | 3w  | @bb    | >parts
+Firmware: read and log               | 2026-10-19 | 4w  | @fw    | >bb
+Print and fit the enclosure          | 2026-11-02 | 2w  | @case  | >encl
+! First readings logged              | 2026-11-20 | >fw
+
+# Field test | #7a5d96
+Mount outside and run unattended     | 2026-11-23 | 3w  | @field | >case
+Calibrate against a reference        | 2026-12-07 | 2w  | @cal   | >field
+~ Two weeks of readings beside a known-good instrument, then one correction curve
+~ per sensor. This phase carries an explicit colour, set with "# Field test | #7a5d96".
+Fix what the field test breaks       | 2026-12-21 | 2w  | @fix   | >field
+
+# Write-up
+Collect the plots                    | 2027-01-04 | 1w  | @plots | >cal
+Write the build log                  | 2027-01-11 | 2w  | @log   | >plots
+Photograph the finished unit         | 2027-01-18 | 1w  | @photo | >fix
+! Published                          | 2027-01-26 | >log
+`;
+
+const DEF={orient:"landscape",unit:"w",margin:12,rowH:4.8,labelW:68,fs:7.5,maxCols:0,zoom:"fit",face:"sans",
+  cTask:"#2f6f9f",cPhase:"#5c6773",cMs:"#8a6d1f",cToday:"#c0392b",
+  dates:true,arrows:true,groups:true,prog:true,today:true,colour:true,zebra:true,legend:true,
+  pweek:true,notes:true};
+const CTL={orient:"orient",unit:"unit",margin:"margin",rowH:"rowH",labelW:"labelW",fs:"fs",
+  maxCols:"maxCols",zoom:"zoom",face:"face",dates:"cDates",arrows:"cArrows",groups:"cGroups",prog:"cProg",
+  today:"cToday",colour:"cColor",zebra:"cZebra",legend:"cLegend",pweek:"cPWeek",notes:"cNotes",
+  cTask:"kTask",cPhase:"kPhase",cMs:"kMs",cToday:"kToday"};
+
+function readOpt(){
+  const o={};
+  for(const k in CTL){ const e=$(CTL[k]);
+    o[k]= e.type==="checkbox" ? e.checked : e.type==="number" ? (parseFloat(e.value)||0) : e.value; }
+  return o;
+}
+function writeOpt(o){ for(const k in CTL){ const e=$(CTL[k]);
+  if(e.type==="checkbox") e.checked=!!o[k]; else e.value=o[k]; } }
+
+/* ========================= persistence ========================= */
+function save(){ try{ localStorage.setItem("ptools.gantt-a4.state",JSON.stringify({src:$("src").value,opt:readOpt()})); }catch(e){} }
+function load(){ try{ const r=localStorage.getItem("ptools.gantt-a4.state"); if(!r) return null; return JSON.parse(r); }catch(e){ return null; } }
+
+/* ========================= pipeline ========================= */
+function measure(){
+  const p=el("",{position:"absolute",visibility:"hidden",width:"100mm",height:"1mm"});
+  document.body.appendChild(p); PXMM=p.getBoundingClientRect().width/100; p.remove();
+}
+let ERRS=[];
+function rebuild(reparse){
+  if(reparse!==false){ const r=parse($("src").value); ITEMS=r.items; ERRS=r.errs; }
+  const opt=readOpt();
+  // "Task bars" has no effect while phases drive the colour — say so and grey it out
+  $("kTask").disabled=opt.colour;
+  $("kTask").closest("label").style.opacity=opt.colour?".45":"1";
+  $("colourNote").textContent=opt.colour
+    ? "Colour by phase is on, so each phase sets the colour of its own tasks and \u201cTask bars\u201d is disabled. Select a phase row to recolour that phase."
+    : "Every task bar uses \u201cTask bars\u201d. Select any row to override just that one.";
+  M=model(ITEMS,opt);
+  LAST=render(M,opt,$("preview"));
+  applyZoom(opt);
+
+  const e=$("errs"); e.textContent="";
+  [...new Set(ERRS)].slice(0,8).forEach(t=>e.appendChild(el("",{},t)));
+
+  const f=$("fit");
+  if(M&&LAST.colW){
+    const w=LAST.colW, unit=opt.unit==="w"?"week":opt.unit==="d"?"day":"month";
+    let msg=`${w.toFixed(1)} mm per ${unit}`;
+    if(LAST.pages>1) msg+=` · ${LAST.pages} pages`;
+    f.textContent=msg;
+    f.style.color = w<4 ? "var(--danger)" : "var(--dim)";
+    if(w<4) f.textContent=msg+` — too narrow to read, use a coarser unit or a wider page`;
+  } else f.textContent="";
+
+  $("addWhere").textContent=addHint();
+  if(M){ const t=M.rows.filter(r=>r.kind==="task").length, m=M.rows.filter(r=>r.kind==="ms").length;
+    $("stats").textContent=`${t} tasks · ${m} milestones · ${M.cols} cols · ${LAST.rowsPP}/page`; }
+  syncInspector(); save();
+}
+function applyZoom(opt){
+  const box=$("preview"); const land=opt.orient==="landscape";
+  const wPx=(land?297:210)*PXMM, hPx=(land?210:297)*PXMM;
+  let s = opt.zoom==="fit" ? Math.min(1.6,(box.clientWidth-46)/wPx) : parseFloat(opt.zoom);
+  if(!isFinite(s)||s<=0) s=1;
+  box.querySelectorAll(".pagewrap").forEach(w=>{
+    w.style.width=(wPx*s)+"px"; w.style.height=(hPx*s)+"px";
+    w.firstChild.style.transform="scale("+s+")";
+  });
+  box.dataset.scale=s;
+}
+
+/* ========================= editing ========================= */
+function commit(){ $("src").value=serialize(ITEMS); rebuild(false); scheduleWrite(); }
+function rowRef(i){ return M&&M.rows[i]?M.rows[i].ref:null; }
+function stepDays(shift,unit){ return shift?1:(unit==="w"?7:1); }
+
+function select(i){ selIdx=i; rebuild(); }
+
+function effColour(row,opt){
+  const r=row.ref, ph=row.kind==="phase"?row:row.phRow;
+  if(r.color) return r.color;
+  if(row.kind==="phase") return opt.cPhase;
+  if(row.kind==="ms") return opt.cMs;
+  if(opt.colour) return (ph&&ph.color)||(row.phase>=0?PAL[row.phase%PAL.length]:PAL[0]);
+  return opt.cTask;
+}
+function syncInspector(){
+  const r=rowRef(selIdx), row=M&&M.rows[selIdx];
+  const box=$("inspector"), isPh=row&&row.kind==="phase", isMs=row&&row.kind==="ms";
+  if(!r||!row){ box.hidden=true; return; }
+  box.hidden=false;
+  const opt=readOpt();
+  $("iName").value=r.name;
+  $("iStart").value=isPh?(row.start?d2s(row.start):""):d2s(r.start);
+  $("iEnd").value=isPh?(row.end?d2s(row.end):""):(isMs?"":d2s(r.end));
+  $("iStart").disabled=isPh; $("iEnd").disabled=isPh||isMs;
+  $("iProg").value=r.prog==null?"":r.prog;  $("iProg").disabled=isPh||isMs;
+  $("iId").value=r.id||"";                  $("iId").disabled=isPh;
+  $("iDeps").value=(r.deps||[]).join(",");  $("iDeps").disabled=isPh;
+  $("iNote").value=r.note||"";
+  $("iColor").value=effColour(row,opt);
+  $("colState").textContent = r.color ? "set on this row"
+    : isPh ? "default phase colour"
+    : isMs ? "default milestone colour"
+    : opt.colour ? "from its phase" : "default task colour";
+  $("clrColor").disabled=!r.color;
+  $("linkBtn").disabled=isPh;
+  $("linkBtn").classList.toggle("on",linkFrom===selIdx);
+}
+
+/* drag */
+let drag=null;
+$("preview").addEventListener("pointerdown",ev=>{
+  const hit=ev.target.closest(".bar2,.ms2,.lbl,.grp");
+  if(!hit){ return; }
+  const i=+hit.dataset.row; if(isNaN(i)) return;
+  if(linkFrom>=0&&linkFrom!==i){ makeLink(linkFrom,i); linkFrom=-1; return; }
+  if(hit.classList.contains("lbl")||hit.classList.contains("grp")){
+    if(hit.classList.contains("editing")) return;    // already typing in it
+    const now=Date.now();
+    if(hit.classList.contains("lbl")&&lastLab.i===i&&now-lastLab.t<550){
+      lastLab={i:-1,t:0}; ev.preventDefault();
+      select(i); startEditRow(i); return;            // re-found after the re-render
+    }
+    lastLab={i,t:now}; select(i); return;
+  }
+  const r=rowRef(i); if(!r) return;
+  const mode = ev.target.classList.contains("hl")?"L":ev.target.classList.contains("hr")?"R":"M";
+  const sc=parseFloat($("preview").dataset.scale)||1;
+  drag={i,r,mode,x0:ev.clientX,s0:new Date(r.start),e0:r.end?new Date(r.end):null,
+        colW:LAST.colW,unitDays:M.unit==="w"?7:M.unit==="d"?1:30.44,sc,moved:false};
+  selIdx=i; hit.classList.add("drag"); hit.setPointerCapture?.(ev.pointerId);
+  ev.preventDefault();
+});
+window.addEventListener("pointermove",ev=>{
+  if(!drag) return;
+  const dxMm=(ev.clientX-drag.x0)/(PXMM*drag.sc);
+  const raw=dxMm/drag.colW*drag.unitDays;
+  const st=stepDays(ev.shiftKey,M.unit);
+  const dd=Math.round(raw/st)*st;
+  if(dd===0&&!drag.moved) return;
+  drag.moved=true;
+  const r=drag.r;
+  if(drag.mode==="M"){ r.start=addDays(drag.s0,dd); if(drag.e0) r.end=addDays(drag.e0,dd); }
+  else if(drag.mode==="L"){ const ns=addDays(drag.s0,dd); if(diffDays(r.end,ns)>=0) r.start=ns; }
+  else { const ne=addDays(drag.e0,dd); if(diffDays(ne,r.start)>=0) r.end=ne; }
+  commit();
+});
+window.addEventListener("pointerup",()=>{ if(drag){ drag=null; rebuild(); } });
+
+function makeLink(from,to){
+  const a=rowRef(from), b=rowRef(to); if(!a||!b||a===b) return;
+  if(!a.id){ let n=1; const used=new Set(ITEMS.filter(x=>x.id).map(x=>x.id));
+    while(used.has("t"+n)) n++; a.id="t"+n; }
+  b.deps=b.deps||[]; if(!b.deps.includes(a.id)) b.deps.push(a.id);
+  selIdx=to; commit();
+}
+
+/* inspector edits */
+[["iName","name"],["iId","id"],["iDeps","deps"],["iProg","prog"],["iStart","start"],["iEnd","end"],
+ ["iColor","color"],["iNote","note"]]
+.forEach(([id,field])=>{
+  $(id).addEventListener("change",()=>{
+    const r=rowRef(selIdx); if(!r) return; const v=$(id).value.trim();
+    if(field==="note"){ r.note=cleanNote(v)||null; }
+    else if(field==="color"){ r.color=v.toLowerCase(); }
+    else if(field==="name"){ const c=cleanName(v); if(c){ r.name=c; $(id).value=c; } }
+    else if(field==="id"){ r.id=v||null; }
+    else if(field==="deps"){ r.deps=v?v.split(",").map(s=>s.trim()).filter(Boolean):[]; }
+    else if(field==="prog"){ r.prog=v===""?null:Math.max(0,Math.min(100,+v)); }
+    else{ if(M&&M.rows[selIdx]&&M.rows[selIdx].kind==="phase") return;
+      const d=s2d(v); if(!d) return;
+      if(field==="start"){ const len=r.end?diffDays(r.end,r.start):0; r.start=d; if(r.end)r.end=addDays(d,len); }
+      else if(diffDays(d,r.start)>=0) r.end=d; }
+    commit();
+  });
+});
+
+/* row ops */
+function itemIndex(i){ const r=M&&M.rows[i]; return r?ITEMS.indexOf(r.ref):-1; }
+function move(dir){
+  const k=itemIndex(selIdx); if(k<0) return;
+  let j=k+dir;
+  while(j>=0&&j<ITEMS.length&&(ITEMS[j].kind==="raw"||ITEMS[j].kind==="dir")) j+=dir;
+  if(j<0||j>=ITEMS.length) return;
+  [ITEMS[k],ITEMS[j]]=[ITEMS[j],ITEMS[k]];
+  selIdx+=dir; commit();
+}
+$("upBtn").onclick=()=>move(-1);
+$("downBtn").onclick=()=>move(1);
+$("delBtn").onclick=()=>{ const k=itemIndex(selIdx); if(k<0)return;
+  ITEMS.splice(k,1); selIdx=Math.max(0,selIdx-1); commit(); };
+$("dupBtn").onclick=()=>{ const k=itemIndex(selIdx); if(k<0)return;
+  const c=JSON.parse(JSON.stringify(ITEMS[k]));
+  c.start=new Date(ITEMS[k].start); if(ITEMS[k].end)c.end=new Date(ITEMS[k].end);
+  c.id=null; c.name=c.name+" (copy)"; ITEMS.splice(k+1,0,c); selIdx++; commit(); };
+$("linkBtn").onclick=()=>{ linkFrom=linkFrom===selIdx?-1:selIdx; syncInspector(); };
+$("clrColor").onclick=()=>{ const r=rowRef(selIdx); if(!r) return; r.color=null; commit(); };
+
+/* New rows land next to the selection, not at the end of the document:
+   a selected phase takes them at the end of its block, a selected task or
+   milestone takes them directly beneath itself. Dates are seeded from the
+   neighbour they land next to, so a task added inside a phase continues that
+   phase rather than the far end of the project. */
+function lastDated(a,b){ for(let i=b-1;i>=a;i--){ const it=ITEMS[i];
+  if(it&&(it.kind==="task"||it.kind==="ms")) return it; } return null; }
+function endOfBlock(k){                       // first index past the phase that starts at k
+  let j=k+1; while(j<ITEMS.length&&ITEMS[j].kind!=="phase") j++;
+  while(j-1>k&&ITEMS[j-1].kind==="raw") j--;  // stay inside the block, above trailing blank lines
+  return j;
+}
+function spot(){
+  const row=(M&&selIdx>=0)?M.rows[selIdx]:null;
+  if(row){
+    const k=ITEMS.indexOf(row.ref);
+    if(k>=0){
+      const at=row.kind==="phase"?endOfBlock(k):k+1;
+      return {at,near:lastDated(0,at)};
+    }
+  }
+  return {at:ITEMS.length,near:lastDated(0,ITEMS.length)};
+}
+function addRow(kind,forceStart){
+  const {at,near}=spot();
+  const base = forceStart || (near&&near.start
+    ? (kind==="ms" ? (near.end||near.start) : addDays(near.end||near.start,1))
+    : (M?M.lo:s2d("2026-09-14")));
+  const it = kind==="ms"
+    ? {kind:"ms",name:"New milestone",start:base,prog:null,id:null,deps:[],color:null}
+    : {kind:"task",name:"New task",start:base,end:addDays(base,6),durForm:"w",
+       prog:null,id:null,deps:[],color:null};
+  ITEMS.splice(at,0,it); landOn(it);
+}
+function landOn(item){                        // commit, then select whatever row the item became
+  commit();
+  if(M){ const i=M.rows.findIndex(r=>r.ref===item); if(i>=0){ selIdx=i; rebuild(false); } }
+}
+function clip(t){ return t.length>26?t.slice(0,25)+"…":t; }
+/* "|" separates fields and a leading #/!/%/// changes what the line means,
+   so a name carrying one would be read back as a different row entirely. */
+/* a description is free text, but it must not start a new source line that
+   the parser would read as something else */
+function cleanNote(v){
+  return (v||"").replace(/[\r\n]+/g," ").replace(/\s+/g," ").trim().slice(0,600);
+}
+function cleanName(v){
+  return (v||"").replace(/[\r\n\t]+/g," ").replace(/\|/g,"/")
+    .replace(/^\s*(?:\/\/|[#!%])+\s*/,"").replace(/\s+/g," ").trim().slice(0,140);
+}
+function addHint(){
+  const row=(M&&selIdx>=0)?M.rows[selIdx]:null;
+  if(!row) return "Nothing selected — new rows go at the end.";
+  if(row.kind==="phase") return "New rows join the end of “"+clip(row.name)+"”.";
+  return "New rows go just below “"+clip(row.name)+"”"
+    +(row.phRow?", in “"+clip(row.phRow.name)+"”":"")+".";
+}
+$("addTask").onclick=()=>addRow("task");
+$("addMs").onclick=()=>addRow("ms");
+$("addPhase").onclick=()=>{
+  const row=(M&&selIdx>=0)?M.rows[selIdx]:null;
+  let at=ITEMS.length;
+  if(row){                                    // sit after the block the selection belongs to
+    const anchor=row.kind==="phase"?row.ref:(row.phRow?row.phRow.ref:row.ref);
+    const k=ITEMS.indexOf(anchor);
+    if(k>=0) at=row.kind==="phase"||row.phRow?endOfBlock(k):k+1;
+  }
+  const ph={kind:"phase",name:"New phase",color:null};
+  ITEMS.splice(at,0,ph); landOn(ph);
+};
+
+document.addEventListener("keydown",ev=>{
+  if(isEditing()) return;
+  if(ev.key==="F2"&&selIdx>=0&&!/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)){
+    startEditRow(selIdx); ev.preventDefault(); return; }
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
+  if(ev.key==="Escape"){ selIdx=-1; linkFrom=-1; rebuild(); return; }
+  if(ev.key!=="ArrowLeft"&&ev.key!=="ArrowRight") return;
+  const r=rowRef(selIdx); if(!r) return;
+  const d=(ev.key==="ArrowRight"?1:-1)*stepDays(ev.shiftKey,M.unit);
+  r.start=addDays(r.start,d); if(r.end) r.end=addDays(r.end,d);
+  ev.preventDefault(); commit();
+});
+
+/* ========================= chrome ========================= */
+let tmr;
+$("src").addEventListener("input",()=>{ clearTimeout(tmr);
+  tmr=setTimeout(()=>{selIdx=-1;rebuild();scheduleWrite();},220); });
+for(const k in CTL) $(CTL[k]).addEventListener("change",()=>{
+  if(k==="orient"){ $("pagerule").textContent="@page{size:A4 "+$("orient").value+";margin:0}"; }
+  rebuild();
+});
+$("printBtn").onclick=()=>window.print();
+$("fmtBtn").onclick=()=>commit();
+$("copyBtn").onclick=async()=>{
+  try{ await navigator.clipboard.writeText($("src").value); $("copyBtn").textContent="Copied"; }
+  catch(e){ $("src").select(); $("copyBtn").textContent="Select + ⌘C"; }
+  setTimeout(()=>$("copyBtn").textContent="Copy source",1400);
+};
+$("saveBtn").onclick=()=>{
+  const b=new Blob([$("src").value],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(b);
+  a.download="timeline.gantt"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+};
+$("loadBtn").onclick=()=>$("fileIn").click();
+$("fileIn").onchange=e=>{ const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader(); rd.onload=()=>{ $("src").value=rd.result; selIdx=-1; rebuild(); scheduleWrite(); }; rd.readAsText(f); };
+$("seedBtn").onclick=()=>{ if(!$("src").value.trim()||confirmReplace()){ $("src").value=SEED; selIdx=-1; rebuild(); } };
+function confirmReplace(){ return window.confirm("Replace the current plan with the example?"); }
+/* App theme. The key is shared with the other tools on this origin, so the
+   choice carries across them, and a storage event keeps open tabs in step. */
+const THEME_KEY="ptools.theme";
+function themeStored(){ try{ return localStorage.getItem(THEME_KEY); }catch(e){ return null; } }
+const THEME_SUN='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.3M12 19.1v2.3M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.6 12h2.3M19.1 12h2.3M4.4 19.6l1.6-1.6M18 6l1.6-1.6"/></svg>';
+const THEME_MOON='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 13.2A8.3 8.3 0 1 1 10.8 3.5 6.5 6.5 0 0 0 20.5 13.2z"/></svg>';
+function themeApply(t){
+  const r=document.documentElement;
+  if(t==="dark"||t==="light") r.setAttribute("data-theme",t); else r.removeAttribute("data-theme");
+  const dark = (t==="dark"||t==="light") ? t==="dark" : matchMedia("(prefers-color-scheme:dark)").matches;
+  $("themeBtn").innerHTML = dark ? THEME_MOON : THEME_SUN;
+}
+themeApply(themeStored());
+$("themeBtn").onclick=()=>{
+  const s=themeStored();
+  const dark = s ? s==="dark" : matchMedia("(prefers-color-scheme:dark)").matches;
+  const next = dark ? "light" : "dark";
+  try{ localStorage.setItem(THEME_KEY,next); }catch(e){}
+  themeApply(next);
+};
+addEventListener("storage",e=>{ if(e.key===THEME_KEY||e.key===null) themeApply(themeStored()); });
+// a page restored from the back/forward cache, or a tab the browser froze,
+// never received the storage event, so re-read the key when it comes back
+window.addEventListener("pageshow",function(e){ if(e.persisted) themeApply(themeStored()); });
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible") themeApply(themeStored());
+});
+try{ matchMedia("(prefers-color-scheme:dark)")
+  .addEventListener("change",()=>{ if(!themeStored()) themeApply(null); }); }catch(e){}  // follow the OS until a choice is made
+let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>applyZoom(readOpt()),140); });
+
+
+
+
+
+/* ========================= rename on the canvas =========================
+   The chart is re-rendered wholesale on selection, so the label node a first
+   click lands on is gone by the second: a native dblclick would fire on their
+   common ancestor instead. Double-click is therefore detected by row index and
+   the element re-found afterwards.                                          */
+let editing=null, lastLab={i:-1,t:0};
+
+/* The lock exists to stop a second edit starting on top of the first, so it
+   must never outlive the element it guards. A rebuild can remove the focused
+   label, and Firefox does not reliably fire blur on a node that is taken out
+   of the document, which left the lock set for good: every later rename, and
+   every keyboard shortcut, was refused until a reload. Trust the DOM, not the
+   flag. */
+function isEditing(){
+  if(editing && !$("preview").querySelector(".lbl.editing")) editing=null;
+  return !!editing;
+}
+
+/* Resolve the edit on the way down, before any handler can rebuild the chart
+   out from under it. Blur alone was not dependable across engines. */
+document.addEventListener("pointerdown",ev=>{
+  if(!editing) return;
+  const lb=$("preview").querySelector(".lbl.editing");
+  if(lb && !lb.contains(ev.target)) endEdit(true);
+},true);
+
+function startEditRow(i){
+  if(isEditing()) return;
+  const lb=$("preview").querySelector('.lbl[data-row="'+i+'"]');
+  const r=rowRef(i); if(!lb||!r) return;
+  editing={i,was:r.name};
+  const mk=lb.querySelector(".nmark"); if(mk) mk.remove();   // keep it out of the edited text
+  lb.classList.add("editing");
+  try{ lb.contentEditable="plaintext-only"; }catch(e){}   // older engines throw on an unknown value
+  if(lb.contentEditable!=="plaintext-only"){        // older engines: strip rich paste by hand
+    lb.contentEditable="true";
+    lb.onpaste=ev=>{ ev.preventDefault();
+      const t=((ev.clipboardData||window.clipboardData).getData("text/plain")||"").replace(/\s+/g," ");
+      document.execCommand("insertText",false,t); };
+  }
+  lb.spellcheck=false;
+  lb.onkeydown=ev=>{
+    ev.stopPropagation();                            // arrows must not nudge the bar
+    if(ev.key==="Enter"){ ev.preventDefault(); endEdit(true); }
+    else if(ev.key==="Escape"){ ev.preventDefault(); endEdit(false); }
+  };
+  lb.onblur=()=>endEdit(true);
+  lb.focus();
+  const rg=document.createRange(); rg.selectNodeContents(lb);
+  const sl=getSelection(); sl.removeAllRanges(); sl.addRange(rg);
+}
+
+function endEdit(keep){
+  if(!editing) return;
+  const {i,was}=editing; editing=null;
+  const lb=$("preview").querySelector(".lbl.editing")
+       || $("preview").querySelector('.lbl[data-row="'+i+'"].editing');
+  if(lb){ lb.onblur=null; lb.onkeydown=null; lb.onpaste=null;
+          lb.contentEditable="false"; lb.classList.remove("editing"); }
+  const r=rowRef(i), v=keep&&lb?cleanName(lb.textContent):"";
+  if(r&&v&&v!==was){ r.name=v; commit(); }
+  else rebuild(false);                               // put the rendered text back
+}
+
+/* ========================= context menu =========================
+   Right-click in the chart. The row under the pointer decides where new rows
+   are inserted; the x position decides the date they start on, so "add a task
+   starting in KW47" is one gesture rather than add-then-retype-the-date.      */
+const MENU=document.createElement("div");
+MENU.className="menu"; MENU.hidden=true; document.body.appendChild(MENU);
+
+function closeMenu(){ MENU.hidden=true; }
+function mItem(label,hint,fn,off){
+  const b=document.createElement("button"); b.type="button";
+  b.textContent=label;
+  if(hint){ const s2=document.createElement("small"); s2.textContent="  "+hint; b.appendChild(s2); }
+  if(off) b.disabled=true; else b.onclick=()=>{ closeMenu(); fn(); };
+  return b;
+}
+function mSep(){ return document.createElement("hr"); }
+
+function dateAtX(chart,clientX){
+  const g=chart&&chart.__geo; if(!g||!M) return null;
+  const sc=parseFloat($("preview").dataset.scale)||1;
+  const r=chart.getBoundingClientRect();
+  const xMm=(clientX-r.left)/(PXMM*sc);
+  const col=g.c0+(xMm-g.tlX)/g.colW;
+  if(col<g.c0||col>=g.c1) return null;
+  return M.colStart(Math.floor(col));
+}
+
+$("preview").addEventListener("click",ev=>{
+  const a=ev.target.closest(".nmark"); if(!a) return;
+  ev.preventDefault();                       // the href still becomes a PDF link at print time
+  const t=document.getElementById(a.getAttribute("href").slice(1));
+  if(t) t.scrollIntoView({block:"center",behavior:"smooth"});
+});
+$("preview").addEventListener("contextmenu",ev=>{
+  if(!M) return;
+  const chart=ev.target.closest(".chart"); if(!chart) return;
+  ev.preventDefault();
+
+  const holder=ev.target.closest("[data-row]");
+  const i=holder?+holder.dataset.row:-1;
+  const row=(i>=0&&M.rows[i])?M.rows[i]:null;
+
+  // read the geometry first: rebuilding to show the selection detaches this node,
+  // and a detached element reports a zero rect, which silently skews the date
+  const d=dateAtX(chart,ev.clientX);
+  if(row){ selIdx=i; rebuild(false); }          // show what the menu applies to
+  const when=d?(M.unit==="w"?"KW "+isoWeek(d).w:d2s(d)):null;
+
+  MENU.textContent="";
+  const head=document.createElement("div"); head.className="mhead";
+  head.textContent=row?row.name:"Chart";
+  MENU.appendChild(head);
+
+  MENU.appendChild(mItem("Add task",when?"starts "+when:"",()=>{ selIdx=i; addRow("task",d); }));
+  MENU.appendChild(mItem("Add milestone",when?"on "+when:"",()=>{ selIdx=i; addRow("ms",d); }));
+  MENU.appendChild(mItem("Add phase","",()=>{ selIdx=i; $("addPhase").onclick(); }));
+
+  if(row){
+    MENU.appendChild(mSep());
+    MENU.appendChild(mItem("Rename","F2",()=>startEditRow(i)));
+    MENU.appendChild(mItem(row.note?"Edit description":"Add description","",
+      ()=>{ selIdx=i; rebuild(false); $("iNote").focus(); $("iNote").select(); }));
+    MENU.appendChild(mItem("Duplicate","",()=>$("dupBtn").onclick()));
+    MENU.appendChild(mItem("Move up","",()=>move(-1)));
+    MENU.appendChild(mItem("Move down","",()=>move(1)));
+    MENU.appendChild(mItem("Delete","",()=>$("delBtn").onclick()));
+    if(row.kind!=="phase"){
+      MENU.appendChild(mSep());
+      MENU.appendChild(mItem(linkFrom===i?"Cancel link":"Link from here","",
+        ()=>{ linkFrom=linkFrom===i?-1:i; syncInspector(); }));
+    }
+  }
+
+  MENU.hidden=false;
+  const w=MENU.offsetWidth, h=MENU.offsetHeight;
+  MENU.style.left=Math.max(6,Math.min(ev.clientX,innerWidth-w-6))+"px";
+  MENU.style.top=Math.max(6,Math.min(ev.clientY,innerHeight-h-6))+"px";
+});
+
+document.addEventListener("mousedown",ev=>{ if(!MENU.hidden&&!MENU.contains(ev.target)) closeMenu(); });
+document.addEventListener("keydown",ev=>{ if(ev.key==="Escape") closeMenu(); });
+$("preview").addEventListener("scroll",closeMenu);
+addEventListener("resize",closeMenu);
+
+/* ========================= date picker =========================
+   Monday-first, with ISO week numbers down the left. The native control
+   takes its week start from the browser locale and ignores the document's
+   lang attribute, so there is no way to ask it for Monday — hence this.    */
+const DOW=["Mo","Tu","We","Th","Fr","Sa","Su"];
+const CAL=document.createElement("div");
+CAL.className="cal"; CAL.hidden=true; document.body.appendChild(CAL);
+let calFor=null, calMonth=null, calCur=null;
+
+function btn(txt,cls){ const b=document.createElement("button");
+  b.className="mini"+(cls?" "+cls:""); b.type="button"; b.textContent=txt; return b; }
+
+function drawCal(){
+  CAL.textContent="";
+  const head=document.createElement("div"); head.className="cal-h";
+  const prev=btn("‹"), lab=document.createElement("b"), next=btn("›");
+  prev.title="Previous month"; next.title="Next month";
+  lab.textContent=calMonth.toLocaleDateString("en-GB",{month:"long",year:"numeric",timeZone:"UTC"});
+  prev.onclick=()=>{ calMonth=addMonths(calMonth,-1); drawCal(); };
+  next.onclick=()=>{ calMonth=addMonths(calMonth,1); drawCal(); };
+  head.append(prev,lab,next); CAL.appendChild(head);
+
+  const g=document.createElement("div"); g.className="cal-g";
+  const cell=(txt,cls)=>{ const d=document.createElement("div"); d.className=cls||""; d.textContent=txt; return d; };
+  g.appendChild(cell("","cal-dow"));
+  DOW.forEach(d=>g.appendChild(cell(d,"cal-dow")));
+
+  const today=s2d(d2s(new Date()));
+  let day=mondayOf(calMonth);
+  for(let r=0;r<6;r++){
+    g.appendChild(cell(String(isoWeek(day).w).padStart(2,"0"),"cal-kw"));
+    for(let c=0;c<7;c++){
+      const d=addDays(day,c), cls=["cal-d"];
+      if(d.getUTCMonth()!==calMonth.getUTCMonth()) cls.push("cal-out");
+      if(c>=5) cls.push("cal-we");
+      if(M&&M.lo&&M.hi&&d>=M.lo&&d<=M.hi) cls.push("cal-rng");
+      if(+d===+today) cls.push("cal-today");
+      if(calCur&&+d===+calCur) cls.push("cal-cur");
+      const el2=cell(String(d.getUTCDate()),cls.join(" "));
+      el2.title=d2s(d)+"  ·  KW "+isoWeek(d).w;
+      el2.onclick=()=>commitCal(d);
+      g.appendChild(el2);
+    }
+    day=addDays(day,7);
+  }
+  CAL.appendChild(g);
+
+  const f=document.createElement("div"); f.className="cal-f";
+  const n=document.createElement("span"); n.className="note";
+  n.textContent=calCur?d2s(calCur)+" · KW "+isoWeek(calCur).w:"";
+  const t=btn("Today");
+  t.onclick=()=>{ calCur=today; calMonth=firstOfMonth(today); drawCal(); };
+  f.append(n,t); CAL.appendChild(f);
+}
+
+function placeCal(){
+  if(!calFor) return;
+  const r=calFor.getBoundingClientRect(), h=CAL.offsetHeight||250, w=CAL.offsetWidth||244;
+  let top=r.bottom+4; if(top+h>innerHeight-6) top=Math.max(6,r.top-h-4);
+  CAL.style.top=top+"px";
+  CAL.style.left=Math.max(6,Math.min(r.left,innerWidth-w-6))+"px";
+}
+function openCal(inp){
+  if(inp.disabled) return;
+  calFor=inp;
+  calCur=s2d(inp.value)||(M&&M.lo?M.lo:s2d(d2s(new Date())));
+  calMonth=firstOfMonth(calCur);
+  drawCal(); CAL.hidden=false; placeCal();
+}
+function closeCal(){ CAL.hidden=true; calFor=null; }
+function commitCal(d){
+  if(!calFor) return;
+  calFor.value=d2s(d); calFor.classList.remove("bad");
+  calFor.dispatchEvent(new Event("change",{bubbles:true}));
+  closeCal();
+}
+
+document.querySelectorAll("input.dateIn").forEach(inp=>{
+  inp.addEventListener("focus",()=>openCal(inp));
+  inp.addEventListener("click",()=>openCal(inp));
+  inp.addEventListener("input",()=>{
+    inp.classList.toggle("bad", inp.value.trim()!=="" && !s2d(inp.value.trim()));
+    const d=s2d(inp.value.trim());
+    if(d&&calFor===inp){ calCur=d; calMonth=firstOfMonth(d); drawCal(); placeCal(); }
+  });
+  inp.addEventListener("keydown",ev=>{
+    if(CAL.hidden){ if(ev.key==="ArrowDown"){ openCal(inp); ev.preventDefault(); } return; }
+    const step={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[ev.key];
+    if(step!==undefined){ calCur=addDays(calCur,step); calMonth=firstOfMonth(calCur); drawCal(); ev.preventDefault(); return; }
+    if(ev.key==="PageUp"||ev.key==="PageDown"){
+      calCur=addMonths2(calCur,ev.key==="PageUp"?-1:1); calMonth=firstOfMonth(calCur); drawCal(); ev.preventDefault(); return; }
+    if(ev.key==="Enter"){ commitCal(calCur); ev.preventDefault(); return; }
+    if(ev.key==="Escape"){ closeCal(); ev.preventDefault(); }
+  });
+});
+/* addMonths() snaps to the 1st; keep the day of month when paging by month */
+function addMonths2(d,n){
+  const y=d.getUTCFullYear(), m=d.getUTCMonth()+n, day=d.getUTCDate();
+  const last=new Date(Date.UTC(y,m+1,0,12)).getUTCDate();
+  return new Date(Date.UTC(y,m,Math.min(day,last),12));
+}
+document.addEventListener("mousedown",ev=>{
+  if(CAL.hidden) return;
+  if(!CAL.contains(ev.target)&&ev.target!==calFor) closeCal();
+});
+addEventListener("resize",()=>{ if(!CAL.hidden) placeCal(); });
+document.querySelector(".side-scroll").addEventListener("scroll",()=>{ if(!CAL.hidden) placeCal(); });
+
+/* ========================= linked file =========================
+   Two-way sync with a real .gantt file via the File System Access API.
+   Out: every edit here is debounced and written to the file.
+   In:  FileSystemObserver where available, plus a slow poll as a backstop,
+        because an observer can miss writes made by an external editor that
+        replaces the file rather than writing in place.
+   Echo is suppressed by comparing content, not timestamps: a write we made
+   comes back identical to link.lastSync and is ignored.                      */
+const FS_OK = typeof window.showOpenFilePicker === "function"
+           && typeof window.FileSystemFileHandle !== "undefined";
+let link=null, wTimer=null, watchT=null, fsObs=null;
+
+function lkSay(txt,cls){ $("lkState").textContent=txt;
+  $("lkDot").className="lkdot"+(cls?" "+cls:""); }
+
+/* handle persistence — IndexedDB is the only store that can hold a handle */
+function idbRun(mode,fn){
+  return new Promise((res,rej)=>{
+    const q=indexedDB.open("ptools.gantt-a4.link",1);
+    q.onupgradeneeded=()=>{ if(!q.result.objectStoreNames.contains("h")) q.result.createObjectStore("h"); };
+    q.onerror=()=>rej(q.error);
+    q.onsuccess=()=>{ const db=q.result;
+      let out; const t=db.transaction("h",mode);
+      try{ out=fn(t.objectStore("h")); }catch(e){ rej(e); return; }
+      t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);
+      t.onerror=()=>rej(t.error); };
+  });
+}
+const keepHandle=h=>idbRun("readwrite",st=>st.put(h,"file")).catch(()=>{});
+const recallHandle=()=>idbRun("readonly",st=>st.get("file")).catch(()=>null);
+const dropHandle=()=>idbRun("readwrite",st=>st.delete("file")).catch(()=>{});
+
+async function pickLink(makeNew){
+  try{
+    const types=[{description:"Gantt source",accept:{"text/plain":[".gantt",".txt",".md"]}}];
+    const h = makeNew
+      ? await showSaveFilePicker({suggestedName:"timeline.gantt",types})
+      : (await showOpenFilePicker({multiple:false,types}))[0];
+    await attach(h,makeNew);
+  }catch(e){ if(e.name!=="AbortError"){ $("linkOn").hidden=false; lkSay("could not link: "+e.message,"bad"); } }
+}
+
+async function attach(h,writeMine){
+  if(await h.queryPermission({mode:"readwrite"})!=="granted"
+     && await h.requestPermission({mode:"readwrite"})!=="granted"){
+    $("linkAgain").hidden=false; lkSay("permission refused","bad"); return false;
+  }
+  let disk="";
+  try{ disk=await (await h.getFile()).text(); }catch(e){}
+  link={handle:h,name:h.name,lastSync:null};
+  $("linkIdle").hidden=true; $("linkOn").hidden=false; $("linkAgain").hidden=true;
+  $("lkName").textContent=h.name;
+  if(writeMine||!disk.trim()){ link.lastSync=null; await writeOut(); }   // seed the file from here
+  else { adopt(disk); lkSay("loaded from file","ok"); }                   // file wins on connect
+  await keepHandle(h); startWatch();
+  return true;
+}
+
+function adopt(txt){ $("src").value=txt; link.lastSync=txt; selIdx=-1; rebuild(); }
+
+function scheduleWrite(){ if(!link) return; clearTimeout(wTimer); wTimer=setTimeout(writeOut,500); }
+async function writeOut(){
+  if(!link) return;
+  const txt=$("src").value;
+  if(txt===link.lastSync) return;
+  lkSay("saving…","busy");
+  try{
+    const w=await link.handle.createWritable();   // Chrome writes a temp file and swaps on close
+    await w.write(txt); await w.close();
+    link.lastSync=txt; hideConflict();
+    lkSay("saved "+new Date().toLocaleTimeString(),"ok");
+  }catch(e){
+    lkSay(e.name==="NotAllowedError"?"permission lost — reconnect":"write failed: "+e.name,"bad");
+    if(e.name==="NotAllowedError"){ $("linkAgain").hidden=false; }
+  }
+}
+
+let diskBusy=false;
+async function checkDisk(){
+  if(!link||diskBusy||isEditing()) return; diskBusy=true;
+  try{
+    const txt=await (await link.handle.getFile()).text();
+    if(txt===link.lastSync) return;                       // our own write echoing back
+    if($("src").value!==link.lastSync){ showConflict(txt); return; }
+    adopt(txt); lkSay("reloaded "+new Date().toLocaleTimeString(),"ok");
+  }catch(e){
+    if(e.name==="NotFoundError"){ lkSay("file is gone","bad"); stopWatch(); }
+    else if(e.name==="NotAllowedError"){ lkSay("permission lost — reconnect","bad"); $("linkAgain").hidden=false; }
+  }finally{ diskBusy=false; }
+}
+
+let pending=null;
+function showConflict(txt){ pending=txt; $("lkConflict").hidden=false; lkSay("conflict","bad"); }
+function hideConflict(){ pending=null; $("lkConflict").hidden=true; }
+
+function startWatch(){
+  stopWatch();
+  if(typeof FileSystemObserver!=="undefined"){
+    try{ fsObs=new FileSystemObserver(()=>checkDisk()); fsObs.observe(link.handle).catch(()=>{}); }
+    catch(e){ fsObs=null; }
+  }
+  watchT=setInterval(checkDisk, fsObs?3000:900);   // backstop, or the only watcher
+}
+function stopWatch(){
+  if(fsObs){ try{fsObs.disconnect();}catch(e){} fsObs=null; }
+  if(watchT){ clearInterval(watchT); watchT=null; }
+}
+
+$("linkOpen").onclick=()=>pickLink(false);
+$("linkNew").onclick=()=>pickLink(true);
+$("linkAgain").onclick=async()=>{ const h=await recallHandle(); if(h) await attach(h,false); };
+$("linkOff").onclick=async()=>{ stopWatch(); link=null; hideConflict(); await dropHandle();
+  $("linkOn").hidden=true; $("linkIdle").hidden=false; $("linkAgain").hidden=true; };
+$("takeDisk").onclick=()=>{ const t=pending; hideConflict(); if(t!==null){ adopt(t); lkSay("took the file","ok"); } };
+$("takeMine").onclick=()=>{ hideConflict(); link.lastSync=null; writeOut(); };
+
+if(!FS_OK){
+  $("linkOpen").hidden=$("linkNew").hidden=true;
+  $("linkNote").innerHTML="This browser has no File System Access API, so a file can't be linked here. "+
+    "Chrome or Edge can; Firefox and Safari can't. Use <b>Save .gantt</b> and <b>Open…</b> instead.";
+}else{
+  // a handle kept from last time still needs a click to regain permission
+  recallHandle().then(async h=>{
+    if(!h) return;
+    try{ if(await h.queryPermission({mode:"readwrite"})==="granted") await attach(h,false);
+         else { $("linkAgain").hidden=false; $("linkNote").textContent="Previously linked to "+h.name+"."; } }
+    catch(e){}
+  }).catch(()=>{});
+}
+
+/* ========================= boot ========================= */
+measure();
+const st=load();
+writeOpt(Object.assign({},DEF,st&&st.opt||{}));
+$("src").value=(st&&st.src)||SEED;
+$("pagerule").textContent="@page{size:A4 "+$("orient").value+";margin:0}";
+rebuild();
+</script>
+</body>
+</html>

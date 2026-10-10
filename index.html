@@ -1,0 +1,219 @@
+<!doctype html>
+<!--
+  procrastination-tools, landing page
+  https://github.com/USERNAME/procrastination-tools
+
+  Code written by an AI assistant (Claude) to a specification, then tested
+  by hand. MIT licence. Copyright (c) 2026 USERNAME.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>procrastination-tools</title>
+<meta name="description" content="Small single-file browser tools. No install, no server, nothing leaves your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27%2339434f%27%2F%3E%3Crect%20x%3D%276%27%20y%3D%276%27%20width%3D%2714.5%27%20height%3D%2714.5%27%20rx%3D%273%27%20fill%3D%27%23fff%27%20opacity%3D%27.55%27%2F%3E%3Crect%20x%3D%2711.5%27%20y%3D%2711.5%27%20width%3D%2714.5%27%20height%3D%2714.5%27%20rx%3D%273%27%20fill%3D%27%23fff%27%2F%3E%3C%2Fsvg%3E">
+<style>
+  :root{
+    --paper:#f2f4f6; --sheet:#fff; --ink:#192028; --mid:#55606d; --soft:#8b96a3;
+    --rule:#dde2e8; --meta:#5d6874;
+    --annot:#4a6b8a; --annot-ink:#3b5872; --mark:#d4433f; --annot-wash:#e3ecf6;
+    --gantt:#2f6f9f; --gantt-ink:#285e87; --gantt-wash:#dde9f8;
+    --focus:#1f6feb;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#14171b; --sheet:#1b1f25; --ink:#e7eaee; --mid:#a3adb9; --soft:#737e8a;
+      --rule:#2b313a; --meta:#919ba6;
+      --annot:#80a3c4; --annot-ink:#9abbd8; --mark:#e86b67; --annot-wash:#253140;
+      --gantt:#6ea7d4; --gantt-ink:#8bbce4; --gantt-wash:#1e2d3f;
+      --focus:#6aa8e8; color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14171b; --sheet:#1b1f25; --ink:#e7eaee; --mid:#a3adb9; --soft:#737e8a;
+    --rule:#2b313a; --meta:#919ba6;
+    --annot:#80a3c4; --annot-ink:#9abbd8; --mark:#e86b67; --annot-wash:#253140;
+    --gantt:#6ea7d4; --gantt-ink:#8bbce4; --gantt-wash:#1e2d3f;
+    --focus:#6aa8e8; color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  /* Expanding the details block makes the page scroll. Without a reserved
+     gutter the scrollbar steals width and the centred column jumps sideways. */
+  html{scrollbar-gutter:stable both-edges}
+  @supports not (scrollbar-gutter:stable){ html{overflow-y:scroll} }
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font:16px/1.62 var(--ui);-webkit-font-smoothing:antialiased;
+       text-rendering:optimizeLegibility}
+  .wrap{max-width:660px;margin:0 auto;padding:72px 20px 56px}
+  a{color:inherit}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:3px;border-radius:3px}
+
+  .top{display:flex;align-items:center;gap:14px}
+  h1{margin:0;font:650 clamp(24px,5.6vw,34px)/1.08 var(--ui);letter-spacing:-.033em}
+  .theme{margin-left:auto;flex:0 0 auto;background:none;border:0;padding:6px;
+         color:var(--soft);cursor:pointer;line-height:0;border-radius:7px}
+  .theme:hover{color:var(--ink);background:var(--rule)}
+  .lede{margin:18px 0 0;font-size:18px;line-height:1.5;color:var(--mid);max-width:30em}
+
+  .shelf{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:40px 0 0}
+  @media (max-width:560px){ .shelf{grid-template-columns:1fr} }
+
+  .tool{display:block;text-decoration:none;background:var(--sheet);
+        border:1px solid var(--rule);border-radius:10px;padding:22px 22px 20px;
+        transition:background .14s ease}
+  .tool.annotate{--wash:var(--annot-wash)}
+  .tool.gantt{--wash:var(--gantt-wash)}
+  .tool:hover,.tool:focus-visible{background:var(--wash)}
+  .tool .mark{display:block;margin-bottom:17px;border-radius:12px}
+  .tool .name{font:600 18px/1.3 var(--ui);color:var(--toneink);letter-spacing:-.012em}
+  .tool.annotate .name{--toneink:var(--annot-ink)}
+  .tool.gantt .name{--toneink:var(--gantt-ink)}
+  .tool p{margin:7px 0 0;font-size:14.5px;line-height:1.5;color:var(--mid)}
+  .tool .file{margin:13px 0 0;font:400 12.5px/1 var(--mono);color:var(--meta)}
+
+  .plain{margin:40px 0 0;font-size:15px;line-height:1.6;color:var(--mid);max-width:34em}
+  .plain b{color:var(--ink);font-weight:600}
+
+  details{margin:18px 0 0;max-width:34em}
+  summary{cursor:pointer;font-size:14.5px;color:var(--mid);width:fit-content;
+          padding:3px 0;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+";display:inline-block;width:1.1em;color:var(--soft);
+                  font:500 15px/1 var(--mono)}
+  details[open] summary::before{content:"\2013"}
+  summary:hover{color:var(--ink)}
+  .more{font-size:14.5px;line-height:1.62;color:var(--mid);
+        padding:4px 0 0 1.1em}
+  .more p{margin:12px 0 0}
+  .more p:first-child{margin-top:0}
+  .more code{font-family:var(--mono);font-size:.9em;color:var(--ink)}
+
+  footer{margin:48px 0 0;padding-top:18px;border-top:1px solid var(--rule);
+         font-size:14px;color:var(--soft);
+         display:flex;gap:22px;flex-wrap:wrap}
+  footer a{color:var(--mid);text-decoration-color:var(--rule);text-underline-offset:3px}
+  footer a:hover{color:var(--ink);text-decoration-color:currentColor}
+
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <h1>procrastination-tools</h1>
+    <button class="theme" id="themeBtn" type="button" aria-label="Switch the theme" title="Switch the theme"></button>
+  </div>
+  <p class="lede">Two small browser tools, each one the result of
+  procrastinating on the work it was built to help with.</p>
+
+  <div class="shelf">
+
+    <a class="tool annotate" href="annotate.html">
+      <svg class="mark" width="54" height="54" viewBox="0 0 54 54" aria-hidden="true">
+        <rect width="54" height="54" rx="12" fill="#4a6b8a"/>
+        <rect x="15" y="15" width="24" height="24" rx="2" fill="none"
+              stroke="#fff" stroke-width="2.6"/>
+        <g fill="#e8605c">
+          <rect x="11" y="11" width="8" height="8" rx="2"/>
+          <rect x="35" y="11" width="8" height="8" rx="2"/>
+          <rect x="11" y="35" width="8" height="8" rx="2"/>
+          <rect x="35" y="35" width="8" height="8" rx="2"/>
+        </g>
+      </svg>
+      <div class="name">Annotate</div>
+      <p>Mark up a screenshot with numbered callouts, boxes and arrows. Exports
+      a vector overlay you can edit again later.</p>
+      <div class="file">annotate.html</div>
+    </a>
+
+    <a class="tool gantt" href="gantt-a4.html">
+      <svg class="mark" width="54" height="54" viewBox="0 0 54 54" aria-hidden="true">
+        <rect width="54" height="54" rx="12" fill="#2f6f9f"/>
+        <rect x="10"   y="13"   width="27" height="6.6" rx="3.3" fill="#fff"/>
+        <rect x="17.5" y="23.7" width="23" height="6.6" rx="3.3" fill="#fff" opacity=".82"/>
+        <rect x="13"   y="34.4" width="18" height="6.6" rx="3.3" fill="#fff" opacity=".64"/>
+        <path d="M37.7 37.7 L41.5 33.9 L45.3 37.7 L41.5 41.5 Z" fill="#f2c667"/>
+      </svg>
+      <div class="name">Gantt A4</div>
+      <p>Write a plan as plain text, get a Gantt chart that prints on one A4
+      sheet. Drag the bars if you would rather not type.</p>
+      <div class="file">gantt-a4.html</div>
+    </a>
+
+  </div>
+
+  <p class="plain">One HTML file each, no install and no account.
+  <b>Nothing you load or type leaves your browser</b>, because neither tool
+  makes a network request of any kind. The code was written by an AI
+  assistant, not by me.</p>
+
+  <details>
+    <summary>How that works, and what to watch out for</summary>
+    <div class="more">
+      <p>Your work is kept in this browser's local storage, so a private
+      window, a cleared cache or a different machine all start empty. Export
+      anything you want to keep: <code>Download SVG</code> in Annotate,
+      <code>Save .gantt</code> in Gantt A4.</p>
+
+      <p>Save the page from your browser, or download the file from the
+      repository, and it runs the same from your own disk with no network at
+      all.</p>
+
+      <p>Both tools have only been tested in Chromium on Linux. They are
+      untested in Firefox, Safari and on phones, and Gantt A4 can only link a
+      file on disk in Chromium. The README lists the rough edges I know
+      about, including an unreliable undo in Gantt A4.</p>
+
+      <p>To be clear about how these were made: I did not write the code. I
+      described what each tool should do, used the versions I got back, said
+      what was wrong, and repeated that until they were useful. The code
+      itself is the AI's work. It comes with no warranty, from either of us.
+      Each tool is a single unminified file, so reading the source before you
+      trust it with something that matters is a realistic thing to do.</p>
+    </div>
+  </details>
+
+  <footer>
+    <span>MIT licence</span>
+    <a href="https://github.com/USERNAME/procrastination-tools">Source and issues</a>
+    <a href="https://github.com/USERNAME/procrastination-tools#readme">README</a>
+  </footer>
+
+</div>
+<script>
+(function(){
+  var KEY="ptools.theme", btn=document.getElementById("themeBtn");
+  var mq=window.matchMedia?window.matchMedia("(prefers-color-scheme: dark)"):null;
+  var SUN='<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.3M12 19.1v2.3M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.6 12h2.3M19.1 12h2.3M4.4 19.6l1.6-1.6M18 6l1.6-1.6"/></svg>';
+  var MOON='<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 13.2A8.3 8.3 0 1 1 10.8 3.5 6.5 6.5 0 0 0 20.5 13.2z"/></svg>';
+  function stored(){ try{ return localStorage.getItem(KEY); }catch(e){ return null; } }
+  function effective(){ var s=stored(); return (s==="dark"||s==="light")?s:(mq&&mq.matches?"dark":"light"); }
+  function apply(t){
+    var r=document.documentElement;
+    if(t==="dark"||t==="light") r.setAttribute("data-theme",t); else r.removeAttribute("data-theme");
+    btn.innerHTML = effective()==="dark" ? MOON : SUN;
+  }
+  apply(stored());
+  btn.addEventListener("click",function(){
+    var next=effective()==="dark"?"light":"dark";
+    try{ localStorage.setItem(KEY,next); }catch(e){}
+    apply(next);
+  });
+  if(mq){ try{ mq.addEventListener("change",function(){ if(!stored()) apply(null); }); }catch(e){} }
+  // another page on this origin changed the shared theme
+  window.addEventListener("storage",function(e){ if(e.key===KEY||e.key===null) apply(stored()); });
+  // a page restored from the back/forward cache, or a tab the browser froze,
+  // never received the storage event, so re-read the key when it comes back
+  window.addEventListener("pageshow",function(e){ if(e.persisted) apply(stored()); });
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState==="visible") apply(stored());
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1277 @@
+<!doctype html>
+<!--
+  annotate, part of procrastination-tools
+  https://github.com/USERNAME/procrastination-tools
+
+  One self-contained file. No build step, no dependencies, no network access.
+  Everything stays in this browser.
+
+  The code below was written by an AI assistant (Claude) to a specification,
+  then tested by hand. It is not minified: read it before you trust it with
+  anything that matters.
+
+  MIT licence. Copyright (c) 2026 USERNAME.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Annotation editor</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iIzRhNmI4YSIvPjxyZWN0IHg9IjUuNSIgeT0iNi41IiB3aWR0aD0iMjEiIGhlaWdodD0iMTkiIHJ4PSIyLjUiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI5IiB5PSIxMSIgd2lkdGg9IjE0IiBoZWlnaHQ9IjEwLjUiIHJ4PSIxLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2U1NDg0ZCIgc3Ryb2tlLXdpZHRoPSIyLjQiLz48ZyBmaWxsPSIjZTU0ODRkIj48cmVjdCB4PSI3LjQiIHk9IjkuNCIgd2lkdGg9IjMuMiIgaGVpZ2h0PSIzLjIiIHJ4PSIwLjYiLz48cmVjdCB4PSIyMS40IiB5PSI5LjQiIHdpZHRoPSIzLjIiIGhlaWdodD0iMy4yIiByeD0iMC42Ii8+PHJlY3QgeD0iNy40IiB5PSIxOS45IiB3aWR0aD0iMy4yIiBoZWlnaHQ9IjMuMiIgcng9IjAuNiIvPjxyZWN0IHg9IjIxLjQiIHk9IjE5LjkiIHdpZHRoPSIzLjIiIGhlaWdodD0iMy4yIiByeD0iMC42Ii8+PC9nPjwvc3ZnPg==">
+<style>
+  /* Interface theme only. Annotation colours live in inline SVG attributes / JS (curColor, item colours, swatch hexes),
+     so switching light <-> dark never touches them or the exported output. */
+  :root { color-scheme:light; --accent:#4a6b8a; --bg:#f6f7f9; --panel:#fff; --line:#d7dce2; --fg:#23272e; --muted:#6b7580;
+          --tint:#eef2f7; --selbg:#e7eefc; --kbd:#eceff3;
+          --btn:#eceff3; --btn-hv:#e0e5ec; --btn-ac:#d4dae3; }
+  :root[data-theme="dark"] { color-scheme:dark; --accent:#6b93bf; --bg:#15171a; --panel:#1e2228; --line:#363c45; --fg:#e6e9ee; --muted:#9aa4b0;
+          --tint:#2a313b; --selbg:#2c3850; --kbd:#2a2f37;
+          --btn:#2a2f37; --btn-hv:#343b45; --btn-ac:#3e4653; }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) { color-scheme:dark; --accent:#6b93bf; --bg:#15171a; --panel:#1e2228; --line:#363c45; --fg:#e6e9ee; --muted:#9aa4b0;
+            --tint:#2a313b; --selbg:#2c3850; --kbd:#2a2f37;
+            --btn:#2a2f37; --btn-hv:#343b45; --btn-ac:#3e4653; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--fg); background:var(--bg); }
+  header { padding:12px 18px; border-bottom:1px solid var(--line); background:var(--panel); display:flex; align-items:center; justify-content:space-between; gap:14px; }
+  header h1 { margin:0; font-size:17px; }
+  header p  { margin:3px 0 0; color:var(--muted); font-size:13px; }
+  main { display:flex; gap:16px; padding:14px; align-items:flex-start; flex-wrap:wrap; }
+  .canvas-col { flex:1 1 480px; min-width:320px; }
+  .panel { flex:1 1 320px; min-width:280px; display:flex; flex-direction:column; gap:11px; }
+
+  .toolbar { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .toolbar button { padding:6px 11px; }
+  .toolbar button.on { background:var(--accent); color:#fff; }
+
+  #drop { position:relative; border:2px dashed var(--line); border-radius:10px; background:var(--panel);
+          min-height:240px; max-height:78vh; display:grid; place-items:center; overflow:auto;
+          scrollbar-gutter:stable both-edges; }
+  #drop.has-img { display:block; text-align:left; }   /* view-only zoom: scroll from top-left when the image is larger */
+  #drop.drag { border-color:var(--accent); background:var(--tint); }
+  #drop .hint { color:var(--muted); text-align:center; padding:32px; font-size:14px; }
+
+  /* same model as annotations.css — the wrapper shrink-wraps the image, the svg overlays it */
+  .annot { position:relative; display:inline-block; max-width:100%; line-height:0; }
+  .annot img { display:block; max-width:100%; height:auto; }
+  .annot-ov { position:absolute; inset:0; width:100%; height:100%; overflow:visible; touch-action:none; }
+  .annot-ov { cursor:crosshair; }
+  .annot-ov [data-id] { cursor:move; }
+  .annot-ov [data-handle] { cursor:nwse-resize; }
+
+  label { display:block; font-size:13px; color:var(--muted); margin:0 0 3px; }
+  input[type=text], input[type=number] { width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:7px; font:inherit; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row > * { flex:0 0 auto; }
+  .grow { flex:1 1 auto; }
+  button { padding:7px 12px; border:0; border-radius:7px; background:var(--btn); color:var(--fg);
+           font:inherit; cursor:pointer; transition:background .13s ease; }
+  button:hover { background:var(--btn-hv); }
+  button:active { background:var(--btn-ac); }
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible {
+           outline:2px solid var(--accent); outline-offset:2px; }
+  button.primary:hover { background:var(--accent); filter:brightness(1.08); }
+  .toolbar button.on:hover { background:var(--accent); filter:brightness(1.08); }
+  button.primary { background:var(--accent); color:#fff; }
+  button:disabled { cursor:default; }
+  select, label.check, input[type=checkbox] { cursor:pointer; }
+  .iconbtn { display:inline-flex; align-items:center; justify-content:center; line-height:0; }
+  .iconbtn svg { display:block; }
+  /* theme toggle: only the icon is clickable — no background, border or padding (this button only) */
+  #themeBtn { background:none; border:0; padding:0; color:var(--muted); cursor:pointer; flex:0 0 auto; }
+  #themeBtn:hover { color:var(--fg); }
+  textarea { width:100%; min-height:150px; padding:10px; border:1px solid var(--line); border-radius:7px;
+             font:12.5px/1.45 "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; resize:vertical; }
+  input[type=color] { width:40px; height:34px; padding:2px; border:1px solid var(--line); border-radius:7px; background:var(--panel); }
+  .swatches { display:flex; gap:5px; }
+  .swatches button { width:22px; height:22px; padding:0; border-radius:50%; border:1px solid var(--line); background:none; }
+
+  .items { border:1px solid var(--line); border-radius:7px; max-height:190px; overflow:auto; }
+  .items .it { display:flex; align-items:center; gap:8px; padding:5px 9px; border-bottom:1px solid var(--line); cursor:pointer; font-size:13.5px; }
+  .items .it:last-child { border-bottom:0; }
+  .items .it.sel { background:var(--selbg); }
+  .items .it .dot { width:12px; height:12px; border-radius:3px; flex:0 0 auto; }
+  .items .it .x { margin-left:auto; border:0; background:none; color:var(--muted); font-size:16px; padding:0 4px; cursor:pointer; }
+  .items .it .x:hover { color:#e5484d; }
+  .empty { color:var(--muted); font-size:13px; padding:9px; }
+
+  .selbox { border:1px solid var(--line); border-radius:7px; padding:9px; display:none; }
+  .selbox.show { display:block; }
+  #arrange button { padding:5px 10px; min-width:34px; }
+  .help { font-size:12.5px; color:var(--muted); }
+  .help kbd { background:var(--kbd); border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 5px; font-size:11px; }
+  .ctxmenu { position:fixed; z-index:1000; background:var(--panel); border:1px solid var(--line); border-radius:8px;
+             box-shadow:0 8px 24px rgba(0,0,0,.14); padding:4px; min-width:170px; }
+  .ctxmenu button { display:flex; width:100%; align-items:center; gap:10px; padding:6px 10px; border:0; background:none;
+                    text-align:left; border-radius:5px; font:inherit; cursor:pointer; }
+  .ctxmenu button:hover { background:var(--tint); }
+  .ctxmenu .k { margin-left:auto; color:var(--muted); font-size:12px; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 5px; }
+  .ctxmenu .sep { height:1px; background:var(--line); margin:4px 2px; }
+  details.help > summary { cursor:pointer; font-weight:600; color:var(--fg); font-size:13px; list-style:revert; }
+  .helpgrid { display:grid; grid-template-columns:1fr 1fr; gap:7px 20px; margin-top:8px; }
+  .helpgrid b { color:var(--fg); }
+  @media (max-width:560px){ .helpgrid { grid-template-columns:1fr; } }
+
+  /* ---- crop modal ---- */
+  .cropmodal { position:fixed; inset:0; z-index:2000; background:rgba(16,20,26,.78); display:flex; flex-direction:column; }
+  .cropmodal[hidden] { display:none; }   /* author display:flex above would otherwise beat the UA [hidden] rule */
+  .cropbar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .cropbar .title { font-weight:600; }
+  .cropbar .spacer { flex:1 1 auto; }
+  .cropbar .readout { font:12.5px/1 "JetBrains Mono",ui-monospace,monospace; color:var(--muted); }
+  .cropstage { position:relative; flex:1 1 auto; overflow:hidden; cursor:crosshair; touch-action:none; }
+  .cropstage.panning { cursor:grabbing; }
+  .cropstage img { position:absolute; left:0; top:0; transform-origin:0 0; user-select:none; -webkit-user-drag:none; image-rendering:auto; }
+  .crophole { position:absolute; box-shadow:0 0 0 9999px rgba(10,12,16,.6); outline:1.5px solid #fff; pointer-events:none; }
+  .crophole .third { position:absolute; background:rgba(255,255,255,.35); }
+  .crophandle { position:absolute; width:12px; height:12px; background:#fff; border:1.5px solid #1f6feb; border-radius:2px; transform:translate(-50%,-50%); pointer-events:auto; }
+
+  /* ---- layout modes (stacked vs side-by-side) ---- */
+  main.stack { flex-direction:column; flex-wrap:nowrap; }
+  main.stack .canvas-col, main.stack .panel { flex:1 1 auto; width:100%; min-width:0; }
+  main.nowrap { flex-wrap:nowrap; }
+  main.nowrap .canvas-col, main.nowrap .panel { min-width:0; }
+  .hdr-actions { display:flex; align-items:center; gap:10px; flex:0 0 auto; }
+  #layoutBtn { padding:5px 10px; font-size:13px; }
+</style>
+<script>/* apply saved interface theme before first paint to avoid a flash */
+try{ var _t=localStorage.getItem("ptools.theme"); if(_t==="dark"||_t==="light") document.documentElement.setAttribute("data-theme",_t); }catch(e){}</script>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Annotation editor</h1>
+    <p>Numbered markers, boxes, circles and arrows over a screenshot &mdash; exports the <code>.annot</code> SVG overlay.</p>
+  </div>
+  <div class="hdr-actions">
+    <button id="layoutBtn" type="button" title="Switch between a stacked and side-by-side page layout">Layout: Auto</button>
+    <button id="themeBtn" class="iconbtn" type="button" aria-label="Toggle dark mode" title="Switch the interface theme — annotation colours and the export are unaffected"></button>
+  </div>
+</header>
+
+<main>
+  <div class="canvas-col">
+    <div class="toolbar" id="tools">
+      <button data-mode="select" id="mode-select" class="on" title="Shortcut: S">Select <span style="opacity:.55">S</span></button>
+      <button data-mode="marker" id="mode-marker" title="Shortcut: Q">① Marker <span style="opacity:.55">Q</span></button>
+      <button data-mode="rect" title="Shortcut: R">▭ Rect <span style="opacity:.55">R</span></button>
+      <button data-mode="circle" title="Shortcut: C">◯ Circle <span style="opacity:.55">C</span></button>
+      <button data-mode="arrow" title="Shortcut: A">↗ Arrow <span style="opacity:.55">A</span></button>
+      <button data-mode="line" title="Shortcut: D">╱ Line <span style="opacity:.55">D</span></button>
+      <span style="width:1px;background:var(--line);margin:0 2px"></span>
+      <button id="cropBtn" title="Crop the image (removes pixels, undoable)">⛶ Crop</button>
+      <select id="zoomSel" title="Canvas zoom — view only, does not affect the export (Ctrl + scroll)">
+        <option value="custom" id="zoomCustom" hidden>—</option>
+        <option value="fit">Fit</option>
+        <option value="0.5">50%</option>
+        <option value="1">100%</option>
+        <option value="1.5">150%</option>
+        <option value="2">200%</option>
+        <option value="4">400%</option>
+      </select>
+    </div>
+    <div id="drop">
+      <div class="hint" id="hint">Drop a screenshot here, or <label style="color:var(--accent);cursor:pointer;display:inline"><u>choose a file</u><input id="file" type="file" accept="image/*" hidden></label>.</div>
+      <div class="annot" id="frame" hidden>
+        <img id="img" alt="">
+        <svg class="annot-ov" id="ov" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+    </div>
+    <details class="help" style="margin-top:8px">
+      <summary>Tips &amp; shortcuts</summary>
+      <div class="helpgrid">
+        <div><b>Tools</b><br>Select <kbd>S</kbd> · Marker <kbd>Q</kbd> · Rect <kbd>R</kbd> · Circle <kbd>C</kbd> · Arrow <kbd>A</kbd> · Line <kbd>D</kbd></div>
+        <div><b>Select</b><br>Click, or drag a box in empty space — left→right encloses, right→left touches. <kbd>Shift</kbd>/<kbd>Ctrl</kbd>‑click adds to the selection.</div>
+        <div><b>Transform</b><br>Drag to move, handles to resize. Drag +<kbd>Shift</kbd> duplicates, +<kbd>Ctrl</kbd> locks 45°. Resize +<kbd>Shift</kbd> keeps aspect, +<kbd>Ctrl</kbd> from centre. Arrow keys nudge (<kbd>Shift</kbd> big, <kbd>Alt</kbd> small).</div>
+        <div><b>New rect / circle</b><br>Hold <kbd>Shift</kbd> for a 1:1 square / perfect circle, <kbd>Ctrl</kbd> to draw from the centre — combine them.</div>
+        <div><b>Markers</b><br>Numbered <b>1, 2, 3</b> or lettered <b>a, b, c</b> — set <b>Marker style</b>, or press <kbd>Tab</kbd> in Marker mode to switch; <b>Uppercase</b> flips the letter case. Snap to shapes when <b>Snap</b> is on (hold <kbd>Tab</kbd> while dragging to flip). Scroll a selected marker to change it.</div>
+        <div><b>Lines &amp; arrows</b><br>Ends snap to shapes and each other. Dragging an end: <kbd>Shift</kbd> = 45° steps (+<kbd>Ctrl</kbd> locks that step), <kbd>Ctrl</kbd> alone locks to the line's current axis, <kbd>Alt</kbd> disables snapping.</div>
+        <div><b>Edit</b><br><kbd>Delete</kbd>/<kbd>X</kbd> remove · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo · right‑click for a menu.</div>
+        <div><b>Crop</b><br><b>Crop</b> opens a zoomable view to trim the image; the pixels are removed and it's undoable.</div>
+        <div><b>View zoom</b><br><kbd>Ctrl</kbd> + scroll (or the zoom menu) zooms the canvas; <kbd>Shift</kbd> + scroll pans sideways. View only — the export is unchanged.</div>
+      </div>
+    </details>
+  </div>
+
+  <div class="panel">
+    <div><label for="src">Image path (as referenced in the page)</label><input id="src" type="text" placeholder="images/settings-panel.png"></div>
+    <div><label for="alt">Alt text</label><input id="alt" type="text" placeholder="Settings panel, export options highlighted"></div>
+
+    <div class="row">
+      <div><label for="color">Colour</label><input id="color" type="color" value="#e5484d"></div>
+      <div class="grow"><label>&nbsp;</label><div class="swatches" id="swatches"></div></div>
+      <div style="width:64px"><label for="next">Next</label><input id="next" type="text" value="1"></div>
+      <div style="width:104px"><label for="mstyle">Marker style</label><select id="mstyle"><option value="numeric">1, 2, 3</option><option value="alpha">a, b, c</option></select></div>
+      <div><label for="mupper" style="white-space:nowrap">Uppercase</label><input id="mupper" type="checkbox" style="width:auto"></div>
+      <div style="width:100px"><label for="asize">Annotation size</label><input id="asize" type="number" min="0.2" step="0.1" value="1"></div>
+      <div style="width:92px"><label for="msize">Marker size</label><input id="msize" type="number" min="0.3" step="0.1" value="1"></div>
+      <div><label for="snap" style="white-space:nowrap">Snap to shapes</label><input id="snap" type="checkbox" checked style="width:auto"></div>
+    </div>
+
+    <div class="selbox" id="selbox">
+      <div class="row">
+        <b id="sel-label" style="font-size:13px">Selected</b>
+        <div id="sel-num-wrap" style="width:92px;display:none"><label for="sel-num">Label</label><input id="sel-num" type="text"></div>
+      </div>
+    </div>
+
+    <div class="selbox" id="arrange">
+      <label style="margin-bottom:6px">Arrange (2+ selected)</label>
+      <div class="row" style="margin-bottom:6px">
+        <span style="font-size:12px;color:var(--muted);width:42px">Align</span>
+        <button data-align="left"    title="Align left edges">⇤</button>
+        <button data-align="hcenter" title="Align horizontal centres">⇔</button>
+        <button data-align="right"   title="Align right edges">⇥</button>
+        <button data-align="top"     title="Align top edges">⤒</button>
+        <button data-align="vmiddle" title="Align vertical centres">⇕</button>
+        <button data-align="bottom"  title="Align bottom edges">⤓</button>
+      </div>
+      <div class="row">
+        <span style="font-size:12px;color:var(--muted);width:42px">Size</span>
+        <button data-eq="width"  title="Match widths to the last-selected shape">Same width</button>
+        <button data-eq="height" title="Match heights to the last-selected shape">Same height</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="undoBtn" title="Undo (Ctrl+Z)">↶ Undo</button>
+      <button id="redoBtn" title="Redo (Ctrl+Y / Ctrl+Shift+Z)">↷ Redo</button>
+    </div>
+
+    <div><label>Items</label><div class="items" id="list"></div></div>
+
+    <div><label for="out">Snippet &mdash; paste into your <code>.md</code></label><textarea id="out" spellcheck="false" readonly></textarea></div>
+    <div class="row">
+      <button class="primary" id="copy">Copy snippet</button>
+      <button id="svgdl" title="One self-contained SVG — shows annotations inline AND in GLightbox zoom">Download SVG</button>
+      <button id="clear">Clear all</button>
+      <button id="importBtn">Import&hellip;</button>
+      <button id="reset" title="Remove the image, annotations, and the saved copy">Reset</button>
+    </div>
+    <p class="help"><b>Copy snippet</b> keeps the screenshot as a separate file with the annotations overlaid — inline only (GLightbox can't draw the overlay in its zoom). <b>Download SVG</b> bakes the screenshot + annotations into one file you reference as a normal image (<code>![alt](images/name.svg)</code>); it shows annotations inline <em>and</em> when zoomed with GLightbox. <b>Annotation size</b> scales with the image width, so marks render at the same on‑screen size across screenshots — the wiki fits every wide image to the text width — so set it once; <b>Marker size</b> tweaks markers on top. Drop a downloaded SVG back in to keep editing its annotations (sizes are restored exactly).</p>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;font-weight:600">Normalize existing files&hellip;</summary>
+      <p class="help" style="margin-top:8px">Re‑scale annotations in files you exported earlier so they match the width‑relative sizing and look equal next to each other. Pick one or more tool‑made <code>.svg</code> files, or paste a <code>&lt;div class="annot"&gt;</code> snippet. Positions, colours and the image stay untouched — only mark and stroke sizes change. <b>Target size</b> uses the same scale as <b>Annotation size</b> above (1 ≈ 3.6% of image width); use the same target for every file to make them match, and keep it at 1 to match freshly made images.</p>
+      <div class="row" style="align-items:flex-end">
+        <div style="width:120px"><label for="normT">Target size</label><input id="normT" type="number" min="0.2" step="0.1" value="1"></div>
+        <button id="normPick" type="button">Choose SVG files&hellip;</button>
+        <button id="normClear" type="button" title="Empty the list below">Clear list</button>
+        <input id="normFiles" type="file" accept=".svg,image/svg+xml" multiple hidden>
+      </div>
+      <p class="help" style="margin:6px 0 0">Each file you pick is added below as a ⤓ link (same name) &mdash; click it to save. <b>Clear list</b> empties this list.</p>
+      <div id="normLog" class="help" style="margin-top:6px"></div>
+      <div><label for="normIn">&hellip;or paste a snippet</label><textarea id="normIn" spellcheck="false" placeholder='&lt;div class="annot"&gt;&hellip;&lt;/div&gt;' style="min-height:70px"></textarea></div>
+      <div class="row"><button id="normRun" type="button">Normalize snippet</button></div>
+      <div><label for="normOut">Normalized snippet</label><textarea id="normOut" spellcheck="false" readonly style="min-height:70px"></textarea></div>
+    </details>
+  </div>
+</main>
+
+<div class="cropmodal" id="cropModal" hidden>
+  <div class="cropbar">
+    <span class="title">Crop image</span>
+    <button id="cropZoomOut" title="Zoom out">−</button>
+    <button id="cropZoomIn" title="Zoom in">+</button>
+    <button id="cropFit" title="Fit to view">Fit</button>
+    <button id="cropFull" title="Reset crop to the whole image">Whole image</button>
+    <span class="readout" id="cropReadout"></span>
+    <span class="spacer"></span>
+    <span class="help" style="margin-right:6px">scroll = zoom · space‑drag = pan</span>
+    <button id="cropCancel">Cancel</button>
+    <button class="primary" id="cropApply">Apply crop</button>
+  </div>
+  <div class="cropstage" id="cropStage">
+    <img id="cropImg" alt="">
+    <div class="crophole" id="cropHole" hidden>
+      <div class="third" style="left:33.33%;top:0;width:1px;height:100%"></div>
+      <div class="third" style="left:66.66%;top:0;width:1px;height:100%"></div>
+      <div class="third" style="top:33.33%;left:0;height:1px;width:100%"></div>
+      <div class="third" style="top:66.66%;left:0;height:1px;width:100%"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var ov = $("ov"), img = $("img"), frame = $("frame"), drop = $("drop"), hint = $("hint");
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var SELC = "#1f6feb";   // selection outline colour
+
+  var items = [];         // each: {kind, id, color, ...coords normalized 0..1}
+  var selIds = [];        // selection, in click order (last = anchor)
+  var mode = "select";
+  var curColor = "#e5484d";
+  var nextNum = 1;
+  var nextAlpha = 1;             // alphabetic marker counter (1 -> a), independent of the numeric one
+  var markerStyle = "numeric";  // numbering method for the NEXT marker: "numeric" or "alpha" (Tab cycles it in Marker mode)
+  var markerUpper = false;      // alphabetic markers upper- vs lower-case (default lower); applied at render to ALL alpha markers
+  var lastParseUpper = null;    // case detected on the most recent import, applied in applyImported
+  var snapOn = true;
+  var markerScale = 1;    // extra multiplier for markers only
+  var annotScale = 1;     // global annotation-size multiplier (set once, sticks across images)
+  var annotDPR = (window.devicePixelRatio||1);   // DPI of the image's source display, captured at load
+  var imgDataURL = "";    // base64 of the current (possibly cropped) image, for the self-contained SVG export
+  var imgStore = {}, imgSeq = 0, curImgId = null;   // distinct image versions, so a crop is undoable without bloating history
+  function putImage(url,w,h){ var id=++imgSeq; imgStore[id]={url:url,w:w,h:h}; return id; }
+  var natW = 0, natH = 0;
+  var op = null;          // active pointer operation
+  var hover = null;       // {snapActive,target} while hovering in Marker mode (snap preview before click)
+  var tabDown = false;    // Tab held -> flip marker snapping during a drag
+  var uidN = 0;
+  var THRESH = 0.005;     // drag threshold (normalized)
+  var SNAP = 0.02, APPROACH = 0.055;   // marker snap-lock range / approach-hint range (normalized)
+
+  function uid() { return "a" + (++uidN); }
+  // ---- marker numbering: numeric (1,2,3) or alphabetic (a,b,c / A,B,C), per-marker style + independent counters ----
+  function alphaLabel(n, up){ n=Math.max(1,Math.floor(n||1)); var s=""; while(n>0){ n--; s=String.fromCharCode(97+(n%26))+s; n=Math.floor(n/26); } return up?s.toUpperCase():s; }
+  function alphaToNum(s){ s=String(s).trim(); if(!/^[A-Za-z]+$/.test(s)) return null; s=s.toLowerCase(); var n=0; for(var i=0;i<s.length;i++) n=n*26+(s.charCodeAt(i)-96); return n; }
+  function labelOf(it){ return (it.style==="alpha") ? alphaLabel(it.num, markerUpper) : String(it.num); }
+  function fieldLabel(style, n){ return style==="alpha" ? alphaLabel(n, markerUpper) : String(n); }
+  function parseField(style, val){ val=String(val).trim();
+    if(style==="alpha"){ var a=alphaToNum(val); if(a!=null) return a; var d=parseInt(val,10); return isNaN(d)?null:Math.max(1,d); }
+    var d2=parseInt(val,10); return isNaN(d2)?null:d2; }
+  function takeNext(style){ return style==="alpha" ? nextAlpha++ : nextNum++; }
+  function newMarker(x,y){ return {kind:"marker",id:uid(),color:curColor,x:x,y:y,num:takeNext(markerStyle),style:markerStyle}; }
+  function syncNext(){ var f=$("next"); if(f) f.value=fieldLabel(markerStyle, markerStyle==="alpha"?nextAlpha:nextNum); }
+  function cycleMarkerStyle(){ markerStyle=(markerStyle==="numeric")?"alpha":"numeric"; var s=$("mstyle"); if(s) s.value=markerStyle; syncNext(); }
+  // Annotation sizes are RELATIVE TO IMAGE WIDTH. The wiki fits every wide image to the same content width (scaling it
+  // by Wd/natW), so a width-relative base makes that natW cancel -> marks render at the SAME on-screen size on every
+  // image. DPI-based sizing (1000*annotDPR) was natW-independent, so the fit-scaling left marks mismatched per image.
+  function unit() { return (natW||1000) * annotScale; }
+  function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) {
+    return ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" })[c]; }); }
+
+  // ---- selection helpers ----
+  function byId(id){ for(var i=0;i<items.length;i++) if(items[i].id===id) return items[i]; return null; }
+  function isSel(id){ return selIds.indexOf(id)>=0; }
+  function selItems(){ return items.filter(function(it){ return isSel(it.id); }); }
+  function anchorItem(){ return selIds.length ? byId(selIds[selIds.length-1]) : null; }
+  function sel(){ return selIds.length===1 ? byId(selIds[0]) : null; }  // single selection
+  function selectOne(id){ selIds = [id]; }
+  function toggleSel(id){ var i=selIds.indexOf(id); if(i>=0) selIds.splice(i,1); else selIds.push(id); }
+  function clearSel(){ selIds = []; }
+
+  // ---- geometry (normalized -> viewBox pixels) ----
+  function uv(px){ return px / (typeof curScale==="function" ? (curScale()||1) : 1); }   // CSS px -> viewBox units, so editor chrome stays a constant on-screen size at any zoom
+  function PX(v){ return v*natW; }
+  function PY(v){ return v*natH; }
+  function sizes(){ var u=unit(), im=Math.min(natW,natH)||1; return {   // annotation sizes scale with zoom (like artwork)
+    sw: Math.max(2, Math.round(u*0.005)), br: Math.max(6, Math.round(u*0.036*markerScale)),
+    fs: Math.max(8, Math.round(u*0.046*markerScale)), rx: Math.round(u*0.012),
+    hs: Math.max(8, Math.round(im*0.020)) }; }   // resize handles stay sized to the image, for grabbability
+  function toNorm(e){ var r=img.getBoundingClientRect();
+    return { x: clamp01((e.clientX-r.left)/r.width), y: clamp01((e.clientY-r.top)/r.height) }; }
+  function bbox(it){
+    if(it.kind==="arrow"||it.kind==="line") return {l:Math.min(it.x1,it.x2),t:Math.min(it.y1,it.y2),r:Math.max(it.x1,it.x2),b:Math.max(it.y1,it.y2)};
+    if(it.kind==="marker") return {l:it.x,t:it.y,r:it.x,b:it.y};
+    return {l:it.x,t:it.y,r:it.x+it.w,b:it.y+it.h};
+  }
+
+  // ---- one annotation element as SVG (shared by preview + export) ----
+  function elXML(it, editor){
+    var z=sizes(), c=esc(it.color), pe = editor?' pointer-events="all"':'';
+    if (it.kind==="rect")
+      return '<rect x="'+PX(it.x).toFixed(1)+'" y="'+PY(it.y).toFixed(1)+'" width="'+PX(it.w).toFixed(1)+'" height="'+PY(it.h).toFixed(1)+'" rx="'+z.rx+'" fill="none" stroke="'+c+'" stroke-width="'+z.sw+'"'+pe+'/>';
+    if (it.kind==="circle"){ var cx=PX(it.x+it.w/2), cy=PY(it.y+it.h/2);
+      return '<ellipse cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" rx="'+PX(it.w/2).toFixed(1)+'" ry="'+PY(it.h/2).toFixed(1)+'" fill="none" stroke="'+c+'" stroke-width="'+z.sw+'"'+pe+'/>'; }
+    if (it.kind==="arrow")
+      return '<line x1="'+PX(it.x1).toFixed(1)+'" y1="'+PY(it.y1).toFixed(1)+'" x2="'+PX(it.x2).toFixed(1)+'" y2="'+PY(it.y2).toFixed(1)+'" fill="none" stroke="'+c+'" stroke-width="'+z.sw+'" stroke-linecap="round" marker-end="url(#ah)"'+pe+'/>';
+    if (it.kind==="line")
+      return '<line x1="'+PX(it.x1).toFixed(1)+'" y1="'+PY(it.y1).toFixed(1)+'" x2="'+PX(it.x2).toFixed(1)+'" y2="'+PY(it.y2).toFixed(1)+'" fill="none" stroke="'+c+'" stroke-width="'+z.sw+'" stroke-linecap="round"'+pe+'/>';
+    if (it.kind==="marker"){ var mx=PX(it.x), my=PY(it.y);
+      return '<g><circle cx="'+mx.toFixed(1)+'" cy="'+my.toFixed(1)+'" r="'+z.br+'" fill="'+c+'"/>'
+        + '<text x="'+mx.toFixed(1)+'" y="'+my.toFixed(1)+'" fill="#fff" font-family="var(--md-text-font-family, Inter, system-ui, sans-serif)" font-size="'+z.fs+'" font-weight="700" text-anchor="middle" dominant-baseline="central">'+esc(labelOf(it))+'</text></g>'; }
+    return "";
+  }
+  function hasArrow(){ for(var i=0;i<items.length;i++) if(items[i].kind==="arrow") return true;
+    return op && op.kind==="draw" && op.type==="arrow"; }
+  function defsXML(){ return hasArrow()
+    ? '<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" markerUnits="strokeWidth" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker></defs>' : ""; }
+
+  function rectFromOp(){                 // rect/circle geometry while drawing, with Shift (1:1) and Ctrl (centre)
+    var x0=op.x0,y0=op.y0,cx=op.cur.x,cy=op.cur.y;
+    var dxp=(cx-x0)*natW, dyp=(cy-y0)*natH, sx=dxp<0?-1:1, sy=dyp<0?-1:1;
+    var wpx=Math.abs(dxp), hpx=Math.abs(dyp);
+    if(op.shift){ var s=Math.max(wpx,hpx); wpx=s; hpx=s; }   // 1:1 in pixel space -> visual square / perfect circle
+    var wN=wpx/natW, hN=hpx/natH, x, y;
+    if(op.ctrl){ x=x0-wN; y=y0-hN; wN*=2; hN*=2; }           // start point is the centre
+    else { x=sx>0?x0:x0-wN; y=sy>0?y0:y0-hN; }
+    return {x:x,y:y,w:wN,h:hN};
+  }
+  function tempItem(){
+    if(!op || op.kind!=="draw") return null;
+    if(op.type==="arrow"||op.type==="line") return {kind:op.type,color:curColor,x1:op.x0,y1:op.y0,x2:op.cur.x,y2:op.cur.y};
+    var r=rectFromOp(); return {kind:op.type==="rect"?"rect":"circle",color:curColor,x:r.x,y:r.y,w:r.w,h:r.h};
+  }
+
+  function handlesXML(){                 // resize handles only when exactly ONE item is selected (constant on-screen size)
+    var it=sel(); if(!it) return ""; var hs=uv(10), hstroke=uv(1.3), out="";
+    function cur(id){ return (id==="n"||id==="s")?"ns-resize":(id==="e"||id==="w")?"ew-resize":
+      (id==="ne"||id==="sw")?"nesw-resize":(id==="p1"||id==="p2")?"move":"nwse-resize"; }
+    function h(id,x,y){ return '<rect data-handle="'+id+'" x="'+(PX(x)-hs/2).toFixed(1)+'" y="'+(PY(y)-hs/2).toFixed(1)+'" width="'+hs.toFixed(1)+'" height="'+hs.toFixed(1)+'" fill="#fff" stroke="'+SELC+'" stroke-width="'+hstroke.toFixed(2)+'" style="cursor:'+cur(id)+'"/>'; }
+    if(it.kind==="rect"||it.kind==="circle"){ var mx=it.x+it.w/2, my=it.y+it.h/2;
+      out+=h("nw",it.x,it.y)+h("n",mx,it.y)+h("ne",it.x+it.w,it.y)+h("e",it.x+it.w,my)
+          +h("se",it.x+it.w,it.y+it.h)+h("s",mx,it.y+it.h)+h("sw",it.x,it.y+it.h)+h("w",it.x,my);
+    } else if(it.kind==="arrow"||it.kind==="line") out+=h("p1",it.x1,it.y1)+h("p2",it.x2,it.y2);
+    return out;
+  }
+  function selOutlineXML(){              // selection chrome — constant on-screen size (positions stay in content coords)
+    var z=sizes(), out="", stroke=uv(1.5), pad=uv(3);
+    selItems().forEach(function(it){
+      if(it.kind==="marker"){
+        out+='<circle cx="'+PX(it.x).toFixed(1)+'" cy="'+PY(it.y).toFixed(1)+'" r="'+(z.br+pad).toFixed(1)+'" fill="none" stroke="'+SELC+'" stroke-width="'+stroke.toFixed(2)+'" pointer-events="none"/>';
+      } else if(it.kind==="arrow"||it.kind==="line"){   // highlight hugs the (zooming) stroke, so it stays proportional to it
+        out+='<line x1="'+PX(it.x1).toFixed(1)+'" y1="'+PY(it.y1).toFixed(1)+'" x2="'+PX(it.x2).toFixed(1)+'" y2="'+PY(it.y2).toFixed(1)+'" fill="none" stroke="'+SELC+'" stroke-width="'+(z.sw*2.4).toFixed(1)+'" stroke-opacity="0.35" stroke-linecap="round" pointer-events="none"/>';
+      } else {
+        var b=bbox(it);
+        out+='<rect x="'+(PX(b.l)-pad).toFixed(1)+'" y="'+(PY(b.t)-pad).toFixed(1)+'" width="'+(PX(b.r-b.l)+pad*2).toFixed(1)+'" height="'+(PY(b.b-b.t)+pad*2).toFixed(1)+'" fill="none" stroke="'+SELC+'" stroke-width="'+stroke.toFixed(2)+'" stroke-dasharray="'+uv(4).toFixed(1)+' '+uv(3).toFixed(1)+'" pointer-events="none"/>';
+      }
+    });
+    return out;
+  }
+  function anchorsXML(){               // faint dot at every snap target (constant on-screen size)
+    if(!((op&&op.snapActive)||(hover&&hover.snapActive))) return "";
+    var r=uv(2.4), out='<g pointer-events="none">';
+    anchors(op&&op.kind==="resize"?op.itemId:null).forEach(function(q){ out+='<circle cx="'+PX(q[0]).toFixed(1)+'" cy="'+PY(q[1]).toFixed(1)+'" r="'+r.toFixed(1)+'" fill="#2f7d6b" opacity="0.35"/>'; });
+    return out+'</g>';
+  }
+  function snapGhost(){                // active-target highlight (constant on-screen size): dashed ring near, solid when locked
+    var t=(op&&op.target)||(hover&&hover.target); if(!t) return "";
+    var cx=PX(t.x).toFixed(1), cy=PY(t.y).toFixed(1), R=uv(9).toFixed(1), dot=uv(2.4).toFixed(1), sw=uv(1.5), d=uv(3).toFixed(1);
+    var ring = t.locked
+      ? '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="#2f7d6b" stroke-width="'+sw.toFixed(2)+'"/>'
+      : '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="#2f7d6b" stroke-width="'+sw.toFixed(2)+'" stroke-dasharray="'+d+' '+d+'"/>';
+    return '<g pointer-events="none">'+ring+'<circle cx="'+cx+'" cy="'+cy+'" r="'+dot+'" fill="#2f7d6b"/></g>';
+  }
+
+  function marqueeMatch(){            // ids inside (L->R) or touching (R->L) the marquee box
+    var l=Math.min(op.startP.x,op.cur.x), r=Math.max(op.startP.x,op.cur.x),
+        t=Math.min(op.startP.y,op.cur.y), b=Math.max(op.startP.y,op.cur.y);
+    var within=op.cur.x>=op.startP.x, ids=[];
+    items.forEach(function(it){ var bb=bbox(it), hit;
+      if(within) hit = bb.l>=l && bb.r<=r && bb.t>=t && bb.b<=b;     // fully enclosed
+      else       hit = !(bb.r<l || bb.l>r || bb.b<t || bb.t>b);      // bounding boxes touch
+      if(hit) ids.push(it.id);
+    });
+    return ids;
+  }
+  function marqueeXML(){
+    if(!(op&&op.kind==="marquee"&&op.moved)) return "";
+    var z=sizes(), within=op.cur.x>=op.startP.x, col=within?"#1f6feb":"#2f7d6b", pad=uv(3), stroke=uv(1.5);
+    var l=Math.min(op.startP.x,op.cur.x), r=Math.max(op.startP.x,op.cur.x),
+        t=Math.min(op.startP.y,op.cur.y), b=Math.max(op.startP.y,op.cur.y), out='<g pointer-events="none">';
+    (op.previewIds||[]).forEach(function(id){ var it=byId(id); if(!it) return;
+      if(it.kind==="marker") out+='<circle cx="'+PX(it.x).toFixed(1)+'" cy="'+PY(it.y).toFixed(1)+'" r="'+(z.br+pad).toFixed(1)+'" fill="none" stroke="'+col+'" stroke-width="'+stroke.toFixed(2)+'"/>';
+      else if(it.kind==="arrow"||it.kind==="line") out+='<line x1="'+PX(it.x1).toFixed(1)+'" y1="'+PY(it.y1).toFixed(1)+'" x2="'+PX(it.x2).toFixed(1)+'" y2="'+PY(it.y2).toFixed(1)+'" fill="none" stroke="'+col+'" stroke-width="'+(z.sw*2.4).toFixed(1)+'" stroke-opacity="0.5" stroke-linecap="round"/>';
+      else { var bb=bbox(it); out+='<rect x="'+(PX(bb.l)-pad).toFixed(1)+'" y="'+(PY(bb.t)-pad).toFixed(1)+'" width="'+(PX(bb.r-bb.l)+pad*2).toFixed(1)+'" height="'+(PY(bb.b-bb.t)+pad*2).toFixed(1)+'" fill="none" stroke="'+col+'" stroke-width="'+stroke.toFixed(2)+'"/>'; }
+    });
+    var dash=within?'':' stroke-dasharray="'+uv(4).toFixed(1)+' '+uv(3).toFixed(1)+'"';
+    out+='<rect x="'+PX(l).toFixed(1)+'" y="'+PY(t).toFixed(1)+'" width="'+PX(r-l).toFixed(1)+'" height="'+PY(b-t).toFixed(1)+'" fill="'+col+'" fill-opacity="0.08" stroke="'+col+'" stroke-width="'+stroke.toFixed(2)+'"'+dash+'/>';
+    return out+'</g>';
+  }
+
+  // ---- view-only canvas zoom (does NOT affect the export; only the on-screen display size) ----
+  var zoomScale = null;   // CSS px per image px; null = Fit (fit width, capped at 100%)
+  function fitScale(){ var cw=(drop.clientWidth||600)-4; return natW ? Math.min(1, cw/natW) : 1; }
+  function curScale(){ return zoomScale!=null ? zoomScale : fitScale(); }
+  function applyZoom(){ if(!natW) return; var sc=curScale();
+    img.style.maxWidth="none"; frame.style.maxWidth="none";
+    img.style.width=(natW*sc)+"px"; img.style.height=(natH*sc)+"px"; }
+  function updateZoomUI(){ var sel=$("zoomSel"); if(!sel) return; var matched=null;
+    if(zoomScale==null) matched="fit";
+    else ["0.5","1","1.5","2","4"].forEach(function(v){ if(Math.abs(parseFloat(v)-zoomScale)<0.001) matched=v; });
+    if(matched){ sel.value=matched; }
+    else { var c=$("zoomCustom"); c.hidden=false; c.textContent=Math.round(curScale()*100)+"%"; sel.value="custom"; } }
+  function centerView(){ drop.scrollLeft=Math.max(0,(drop.scrollWidth-drop.clientWidth)/2);
+    drop.scrollTop=Math.max(0,(drop.scrollHeight-drop.clientHeight)/2); }
+  function zoomAtCursor(e,factor){
+    var rect=img.getBoundingClientRect(); if(!rect.width) return;
+    var ix=(e.clientX-rect.left)/rect.width, iy=(e.clientY-rect.top)/rect.height;   // image point under cursor
+    var ns=Math.max(0.1, Math.min(8, curScale()*factor)); zoomScale=ns; render(); updateZoomUI();   // render -> chrome + content resize for the new zoom
+    var r2=img.getBoundingClientRect();                                             // keep that point under the cursor
+    drop.scrollLeft += r2.left - (e.clientX - ix*(natW*ns));
+    drop.scrollTop  += r2.top  - (e.clientY - iy*(natH*ns));
+  }
+
+  function render(){
+    if(!natW){ drop.classList.remove("has-img"); ov.innerHTML=""; emit(); renderList(); updatePanels(); return; }
+    drop.classList.add("has-img"); applyZoom();
+    ov.setAttribute("viewBox","0 0 "+natW+" "+natH);
+    ov.setAttribute("preserveAspectRatio","xMidYMid meet");
+    var parts=['<rect data-bg="1" x="0" y="0" width="'+natW+'" height="'+natH+'" fill="transparent"/>', defsXML()];
+    items.forEach(function(it){ parts.push('<g data-id="'+it.id+'">'+elXML(it,true)+'</g>'); });
+    var t=tempItem(); if(t) parts.push('<g opacity="0.85">'+elXML(t)+'</g>');
+    parts.push(selOutlineXML()); parts.push(handlesXML()); parts.push(anchorsXML()); parts.push(snapGhost()); parts.push(marqueeXML());
+    ov.innerHTML=parts.join("");
+    emit(); renderList(); updatePanels(); scheduleSave();
+  }
+
+  function emit(){
+    var src=esc($("src").value.trim()||"images/screenshot.png"), alt=esc($("alt").value.trim());
+    if(!items.length && !img.src){ $("out").value=""; return; }
+    var lines=items.map(function(it){ return "    "+elXML(it); });
+    var defs=defsXML(), defLine=defs?("    "+defs+"\n"):"";
+    $("out").value=
+      '<div class="annot" markdown="0" style="position:relative;display:inline-block;max-width:100%;line-height:0">\n'+
+      '  <img src="'+src+'" alt="'+alt+'" style="display:block;max-width:100%;height:auto">\n'+
+      '  <svg class="annot-ov" xmlns="'+SVGNS+'" viewBox="0 0 '+natW+' '+natH+'" data-au="'+unit().toFixed(2)+'" preserveAspectRatio="xMidYMid meet"'+
+      ' style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none">\n'+
+      defLine+(lines.length?lines.join("\n")+"\n":"")+'  </svg>\n</div>';
+  }
+
+  function renderList(){
+    var L=$("list");
+    if(!items.length){ L.innerHTML='<div class="empty">No items yet.</div>'; return; }
+    var icon={marker:"①",rect:"▭",circle:"◯",arrow:"↗",line:"╱"};
+    L.innerHTML=items.map(function(it){
+      var lbl=it.kind==="marker"?("Marker "+labelOf(it)):(it.kind.charAt(0).toUpperCase()+it.kind.slice(1));
+      return '<div class="it'+(isSel(it.id)?' sel':'')+'" data-row="'+it.id+'">'
+        +'<span class="dot" style="background:'+esc(it.color)+'"></span><span>'+icon[it.kind]+' '+esc(lbl)+'</span>'
+        +'<button class="x" data-del="'+it.id+'" title="Delete">&times;</button></div>';
+    }).join("");
+  }
+
+  function updatePanels(){
+    var one=sel();
+    var box=$("selbox"), nw=$("sel-num-wrap");
+    if(one){ box.classList.add("show"); $("sel-label").textContent="Selected: "+one.kind;
+      if(one.kind==="marker"){ nw.style.display=""; $("sel-num").value=fieldLabel(one.style||"numeric",one.num); } else nw.style.display="none";
+    } else box.classList.remove("show");
+    var a=anchorItem(); if(a&&/^#/.test(a.color)) $("color").value=a.color;
+    var ar=$("arrange"), n=selItems().length;
+    if(n>=2){ ar.classList.add("show");
+      var sizable=selItems().filter(function(it){return it.kind==="rect"||it.kind==="circle";}).length;
+      Array.prototype.forEach.call(ar.querySelectorAll("[data-eq]"),function(b){ b.disabled=sizable<2; b.style.opacity=sizable<2?.45:1; });
+    } else ar.classList.remove("show");
+  }
+
+  // ---- snapping markers to shape anchor points ----
+  function anchors(excludeId){
+    var a=[];
+    items.forEach(function(it){
+      if(excludeId && it.id===excludeId) return;      // don't let an endpoint snap to its own element
+      if(it.kind==="rect"||it.kind==="circle"){ var x=it.x,y=it.y,w=it.w,h=it.h;
+        if(it.kind==="rect") a.push([x,y],[x+w,y],[x+w,y+h],[x,y+h],[x+w/2,y],[x+w,y+h/2],[x+w/2,y+h],[x,y+h/2]);
+        else { var cx=x+w/2, cy=y+h/2, dx=w*0.35355339, dy=h*0.35355339;   // dx,dy = r·√2/2, the 45° perimeter offset
+          a.push([cx,y],[x+w,cy],[cx,y+h],[x,cy]);                          // cardinal points
+          a.push([cx+dx,cy-dy],[cx+dx,cy+dy],[cx-dx,cy+dy],[cx-dx,cy-dy]); } // 45° points on the ellipse perimeter
+        a.push([x+w/2,y+h/2]);
+      } else if(it.kind==="arrow"||it.kind==="line"){ a.push([it.x1,it.y1],[it.x2,it.y2],[(it.x1+it.x2)/2,(it.y1+it.y2)/2]); }
+    });
+    return a;
+  }
+  function nearestAnchor(p, excludeId){ var best=null, bd=Infinity;        // absolute nearest, carries its distance
+    anchors(excludeId).forEach(function(q){ var d=Math.hypot(p.x-q[0],p.y-q[1]); if(d<bd){ bd=d; best={x:q[0],y:q[1],d:d}; } });
+    return best; }
+  function evalSnap(p, active, excludeId){        // -> {target:{x,y,locked}|null (what to highlight), snap:anchor|null (where it locks)}
+    if(!active) return {target:null, snap:null};
+    var a=nearestAnchor(p, excludeId);
+    if(a && a.d<=APPROACH){ var locked=a.d<=SNAP; return {target:{x:a.x,y:a.y,locked:locked}, snap:locked?a:null}; }
+    return {target:null, snap:null};
+  }
+  function snap(p){ return snapOn ? evalSnap(p,true).snap : null; }   // placement lock (toggle-governed)
+
+  function setMode(m){ mode=m; if(m!=="marker" && hover){ hover=null; }
+    Array.prototype.forEach.call($("tools").children,function(b){ b.classList.toggle("on",b.dataset.mode===m); });
+    ov.style.cursor=(m==="select")?"default":"crosshair"; }
+
+  // ---- transforms ----
+  function translate(it,dx,dy){
+    if(it.kind==="arrow"||it.kind==="line"){ it.x1=clamp01(it.x1+dx); it.y1=clamp01(it.y1+dy); it.x2=clamp01(it.x2+dx); it.y2=clamp01(it.y2+dy); }
+    else { it.x=clamp01(it.x+dx); it.y=clamp01(it.y+dy); }
+  }
+  var COORDS=["x","y","w","h","x1","y1","x2","y2"];
+  function snapCoords(it){ var c={kind:it.kind}; COORDS.forEach(function(k){ if(it[k]!==undefined) c[k]=it[k]; }); return c; }
+  function snapshotOrig(ids){ var o={}; ids.forEach(function(id){ var it=byId(id); if(it) o[id]=snapCoords(it); }); return o; }
+  function placeFromOrig(it,o,dx,dy){
+    if(it.kind==="arrow"||it.kind==="line"){ it.x1=clamp01(o.x1+dx); it.y1=clamp01(o.y1+dy); it.x2=clamp01(o.x2+dx); it.y2=clamp01(o.y2+dy); }
+    else { it.x=clamp01(o.x+dx); it.y=clamp01(o.y+dy); }
+  }
+  function snap45(dx,dy){ var m=Math.hypot(dx,dy); if(m<1e-9) return {dx:0,dy:0};
+    var a=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4); return {dx:m*Math.cos(a), dy:m*Math.sin(a)}; }
+  // visual 45° snap for a line/arrow end, computed in PIXEL space so the angle is correct for non-square images
+  function snapEndpoint45(fx,fy,px,py,lockAngle){
+    var vx=(px-fx)*natW, vy=(py-fy)*natH, mag=Math.hypot(vx,vy);
+    if(mag<1e-9) return {x:fx,y:fy,angle:(lockAngle!=null?lockAngle:0)};
+    var ang=(lockAngle!=null)?lockAngle:Math.round(Math.atan2(vy,vx)/(Math.PI/4))*(Math.PI/4);
+    if(lockAngle!=null) mag=Math.max(0, vx*Math.cos(ang)+vy*Math.sin(ang));   // project cursor onto the locked ray
+    return { x:clamp01(fx+(mag*Math.cos(ang))/natW), y:clamp01(fy+(mag*Math.sin(ang))/natH), angle:ang };
+  }
+  // Resolve a line/arrow endpoint during create/resize.
+  //   Shift          -> 45° increments (dynamic)
+  //   Shift+Ctrl     -> lock to the chosen 45° increment
+  //   Ctrl (alone)   -> lock to the segment's current axis (resize: its existing direction; create: frozen drag direction)
+  //   Alt            -> disable anchor snapping
+  // Sets op.snapActive / op.target for the highlight. Lives in the create/resize op, so no collision with move-op modifiers.
+  function resolveEnd(fx,fy,p,e,excludeId,o,axisAngle){
+    if(e.shiftKey){
+      var lock=null;
+      if(e.ctrlKey||e.metaKey){ if(o._lockAngle==null){ o._lockAngle=snapEndpoint45(fx,fy,p.x,p.y,null).angle; } lock=o._lockAngle; }
+      else o._lockAngle=null;
+      var s=snapEndpoint45(fx,fy,p.x,p.y,lock); o.snapActive=false; o.target=null; return {x:s.x,y:s.y};
+    }
+    if(e.ctrlKey||e.metaKey){                 // axis lock (no Shift): keep the endpoint on the line's current direction
+      var ang;
+      if(axisAngle!=null){ ang=axisAngle; }   // resize: the existing segment's direction
+      else { if(o._lockAngle==null) o._lockAngle=Math.atan2((p.y-fy)*natH,(p.x-fx)*natW); ang=o._lockAngle; }  // create: freeze drag dir
+      var s2=snapEndpoint45(fx,fy,p.x,p.y,ang); o.snapActive=false; o.target=null; return {x:s2.x,y:s2.y};
+    }
+    o._lockAngle=null;
+    if(snapOn && !e.altKey){ var rr=evalSnap(p,true,excludeId); o.snapActive=true; o.target=rr.target; return rr.snap?{x:rr.snap.x,y:rr.snap.y}:{x:p.x,y:p.y}; }
+    o.snapActive=false; o.target=null; return {x:clamp01(p.x),y:clamp01(p.y)};   // Alt (or snap off) -> free
+  }
+  var HDIR={ nw:[-1,-1], n:[0,-1], ne:[1,-1], e:[1,0], se:[1,1], s:[0,1], sw:[-1,1], w:[-1,0] };
+  function doResize(it,o,handle,p,aspect,center){     // rect/circle only; aspect = Shift (lock ratio) · center = Ctrl (centre)
+    if(!it) return;
+    var H=HDIR[handle]||[0,0], hx=H[0], hy=H[1];
+    var oL=o.x,oT=o.y,oR=o.x+o.w,oB=o.y+o.h, ocx=o.x+o.w/2, ocy=o.y+o.h/2, w, h;
+    if(center){ w=hx?Math.abs(p.x-ocx)*2:o.w; h=hy?Math.abs(p.y-ocy)*2:o.h; }
+    else { w=hx?Math.abs(p.x-(hx>0?oL:oR)):o.w; h=hy?Math.abs(p.y-(hy>0?oT:oB)):o.h; }
+    if(aspect){ var sx=hx?w/(o.w||1e-6):null, sy=hy?h/(o.h||1e-6):null;
+      var s=(sx!=null&&sy!=null)?Math.max(sx,sy):(sx!=null?sx:(sy!=null?sy:1)); w=o.w*s; h=o.h*s; }
+    w=Math.max(w,0.003); h=Math.max(h,0.003);
+    if(center){ it.x=ocx-w/2; it.y=ocy-h/2; }
+    else {
+      if(hx){ var ax=hx>0?oL:oR; it.x=(p.x-ax)<0?ax-w:ax; } else it.x=aspect?ocx-w/2:o.x;
+      if(hy){ var ay=hy>0?oT:oB; it.y=(p.y-ay)<0?ay-h:ay; } else it.y=aspect?ocy-h/2:o.y;
+    }
+    it.w=w; it.h=h;
+  }
+
+  // ---- align / equalize (operate on current selection) ----
+  function arr(get){ return selItems().map(get); }
+  function align(kind){
+    var its=selItems(); if(its.length<2) return;
+    var bs=its.map(function(it){ return {it:it,b:bbox(it)}; });
+    var L=Math.min.apply(null,bs.map(function(o){return o.b.l;})), R=Math.max.apply(null,bs.map(function(o){return o.b.r;}));
+    var T=Math.min.apply(null,bs.map(function(o){return o.b.t;})), B=Math.max.apply(null,bs.map(function(o){return o.b.b;}));
+    bs.forEach(function(o){ var b=o.b, dx=0, dy=0;
+      if(kind==="left") dx=L-b.l; else if(kind==="right") dx=R-b.r; else if(kind==="hcenter") dx=(L+R)/2-(b.l+b.r)/2;
+      else if(kind==="top") dy=T-b.t; else if(kind==="bottom") dy=B-b.b; else if(kind==="vmiddle") dy=(T+B)/2-(b.t+b.b)/2;
+      translate(o.it,dx,dy);
+    });
+    render(); commit();
+  }
+  function equalize(dim){
+    var its=selItems().filter(function(it){ return it.kind==="rect"||it.kind==="circle"; });
+    if(its.length<2) return;
+    var ref=null;                                   // reference = the LAST-selected sizable shape
+    for(var i=selIds.length-1;i>=0;i--){ var r=byId(selIds[i]); if(r&&(r.kind==="rect"||r.kind==="circle")){ ref=r; break; } }
+    if(!ref) ref=its[its.length-1];
+    its.forEach(function(it){ if(it!==ref){ if(dim==="width") it.w=ref.w; else it.h=ref.h; } });
+    render(); commit();
+  }
+
+  function del(id){ items=items.filter(function(it){return it.id!==id;}); selIds=selIds.filter(function(s){return s!==id;}); render(); commit(); }
+  function delSel(){ if(!selIds.length) return; var set={}; selIds.forEach(function(s){set[s]=1;});
+    items=items.filter(function(it){ return !set[it.id]; }); selIds=[]; render(); commit(); }
+  function duplicate(id){ var it=byId(id); if(!it) return; var c=JSON.parse(JSON.stringify(it)); c.id=uid(); var o=0.025;
+    if(c.kind==="arrow"){ c.x1=clamp01(c.x1+o);c.y1=clamp01(c.y1+o);c.x2=clamp01(c.x2+o);c.y2=clamp01(c.y2+o); }
+    else { c.x=clamp01(c.x+o); c.y=clamp01(c.y+o); }
+    if(c.kind==="marker"){ c.num=takeNext(c.style||"numeric"); syncNext(); }
+    items.push(c); selectOne(c.id); render(); commit(); }
+  function idx(id){ for(var i=0;i<items.length;i++) if(items[i].id===id) return i; return -1; }
+  function toFront(id){ var i=idx(id); if(i<0) return; items.push(items.splice(i,1)[0]); render(); commit(); }
+  function toBack(id){ var i=idx(id); if(i<0) return; items.unshift(items.splice(i,1)[0]); render(); commit(); }
+  function addMarkerAt(nx,ny){ var m=newMarker(clamp01(nx),clamp01(ny));
+    items.push(m); syncNext(); selectOne(m.id); render(); commit(); }
+
+  // ---- pointer handling (single delegated model; left button only) ----
+  ov.addEventListener("pointerdown",function(e){
+    if(!natW) return;
+    if(e.button!==0){ return; }            // right/middle -> context menu
+    var ae=document.activeElement;         // a panel field still has focus? first canvas click just escapes it
+    if(ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA")){ ae.blur(); hideMenu(); hover=null; e.preventDefault(); return; }
+    hideMenu(); hover=null; e.preventDefault();
+    var p=toNorm(e), t=e.target, mod=e.shiftKey||e.ctrlKey||e.metaKey;
+    if(mode==="select"){
+      if(t.dataset && t.dataset.handle){ var itR=sel(); if(itR) op={kind:"resize",handle:t.dataset.handle,itemId:itR.id,orig:snapCoords(itR)}; }
+      else { var g=t.closest?t.closest("[data-id]"):null;
+        if(g){ var id=g.dataset.id;
+          var ids=isSel(id)?selIds.slice():[id];
+          op={kind:"move",startP:p,moved:false,hitId:id,modClick:mod,targetIds:ids,orig:snapshotOrig(ids)};
+          if(!mod && !isSel(id)) selectOne(id);          // plain grab selects
+        } else { op={kind:"marquee",startP:p,cur:p,add:mod,moved:false,previewIds:[]}; }   // empty space -> box-select
+      }
+    } else if(mode==="marker"){ op={kind:"marker",p:p,snapActive:snapOn}; var r0=evalSnap(p,snapOn); op.target=r0.target; op.snap=r0.snap; }
+    else { op={kind:"draw",type:mode,x0:p.x,y0:p.y,cur:p};
+      if((mode==="arrow"||mode==="line") && !e.shiftKey && snapOn){ var rs=evalSnap(p,true); if(rs.snap){ op.x0=rs.snap.x; op.y0=rs.snap.y; } } }   // snap the start point too
+    try{ ov.setPointerCapture(e.pointerId); }catch(_){}
+    render();
+  });
+  ov.addEventListener("pointermove",function(e){
+    if(!op){                                   // no drag: in Marker mode, preview the snap target under the cursor
+      if(mode==="marker" && natW){ var hp=toNorm(e); var rh=evalSnap(hp,snapOn); hover={snapActive:snapOn,target:rh.target}; render(); }
+      else if(hover){ hover=null; render(); }
+      return;
+    }
+    hover=null; var p=toNorm(e);
+    if(op.kind==="move"){
+      if(!op.moved && Math.hypot(p.x-op.startP.x,p.y-op.startP.y)>THRESH){
+        op.moved=true;
+        if(e.shiftKey){                         // Shift-drag -> duplicate, then drag the copies
+          var copies=op.targetIds.map(function(id){ var c=JSON.parse(JSON.stringify(byId(id))); c.id=uid(); return c; });
+          copies.forEach(function(c){ items.push(c); });
+          op.targetIds=copies.map(function(c){return c.id;}); op.orig=snapshotOrig(op.targetIds);
+          selIds=op.targetIds.slice();
+        } else if(op.modClick){                 // modified (non-dup) drag -> act on the grabbed item
+          if(!isSel(op.hitId)) selectOne(op.hitId);
+          op.targetIds=isSel(op.hitId)?selIds.slice():[op.hitId]; op.orig=snapshotOrig(op.targetIds);
+        }
+      }
+      if(op.moved){
+        var dx=p.x-op.startP.x, dy=p.y-op.startP.y;
+        if(e.ctrlKey||e.metaKey){ var c45=snap45(dx,dy); dx=c45.dx; dy=c45.dy; }   // Ctrl -> lock to 45°
+        var tids=op.targetIds, only=tids.length===1?byId(tids[0]):null;
+        if(only && only.kind==="marker"){       // single marker: snap to shapes, Tab flips the toggle
+          var o0=op.orig[only.id], fx=clamp01(o0.x+dx), fy=clamp01(o0.y+dy);
+          op.snapActive=(snapOn!==tabDown);
+          var rr=evalSnap({x:fx,y:fy},op.snapActive); op.target=rr.target;
+          only.x=rr.snap?rr.snap.x:fx; only.y=rr.snap?rr.snap.y:fy;
+        } else {
+          tids.forEach(function(id){ var it=byId(id); if(it) placeFromOrig(it,op.orig[id],dx,dy); });
+          op.snapActive=false; op.target=null;
+        }
+      }
+    }
+    else if(op.kind==="resize"){ var rit=byId(op.itemId);
+      if(rit && (rit.kind==="arrow"||rit.kind==="line")){      // endpoint drag: Shift 45° / Ctrl axis-lock / Alt no-snap
+        var ro=op.orig, rfx=op.handle==="p1"?ro.x2:ro.x1, rfy=op.handle==="p1"?ro.y2:ro.y1;
+        var omx=op.handle==="p1"?ro.x1:ro.x2, omy=op.handle==="p1"?ro.y1:ro.y2;   // original moving end -> current axis
+        var axisAngle=Math.atan2((omy-rfy)*natH,(omx-rfx)*natW);
+        var rp=resolveEnd(rfx,rfy,p,e,op.itemId,op,axisAngle);
+        if(op.handle==="p1"){ rit.x1=rp.x; rit.y1=rp.y; } else { rit.x2=rp.x; rit.y2=rp.y; }
+      } else { doResize(rit,op.orig,op.handle,p,e.shiftKey,e.ctrlKey||e.metaKey); op.snapActive=false; op.target=null; }
+    }
+    else if(op.kind==="draw"){
+      if(op.type==="arrow"||op.type==="line"){ var dp=resolveEnd(op.x0,op.y0,p,e,null,op); op.cur={x:dp.x,y:dp.y}; }
+      else { op.cur=p; op.shift=e.shiftKey; op.ctrl=(e.ctrlKey||e.metaKey); op.snapActive=false; op.target=null; }   // Shift=1:1, Ctrl=centre
+    }
+    else if(op.kind==="marquee"){ op.cur=p; if(Math.hypot(p.x-op.startP.x,p.y-op.startP.y)>THRESH) op.moved=true; op.previewIds=marqueeMatch(); }
+    else if(op.kind==="marker"){ op.p=p; op.snapActive=snapOn; var r2=evalSnap(p,snapOn); op.target=r2.target; op.snap=r2.snap; }
+    render();
+  });
+  ov.addEventListener("pointerup",function(){
+    if(!op) return;
+    if(op.kind==="move"){ if(!op.moved){ if(op.modClick) toggleSel(op.hitId); else selectOne(op.hitId); } }   // click, no drag -> (de)select
+    else if(op.kind==="marquee"){
+      if(!op.moved){ if(!op.add) clearSel(); }                       // click on empty -> clear (unless modifier)
+      else { var mm=op.previewIds; selIds = op.add ? selIds.concat(mm.filter(function(id){return selIds.indexOf(id)<0;})) : mm.slice(); }
+    }
+    else if(op.kind==="marker"){ var pt=(snapOn&&op.snap)?op.snap:op.p;
+      var m=newMarker(pt.x,pt.y);
+      items.push(m); syncNext(); selectOne(m.id);
+    } else if(op.kind==="draw"){ var t=tempItem();
+      var big=(t.kind==="arrow"||t.kind==="line")?Math.hypot(t.x2-t.x1,t.y2-t.y1)>THRESH*2:(t.w>THRESH*2&&t.h>THRESH*2);
+      if(big){ t.id=uid(); items.push(t); selectOne(t.id); setMode("select"); }
+    }
+    op=null; render(); commit();   // one history entry per completed gesture (dedup skips selection-only marquees)
+  });
+
+  ov.addEventListener("pointerleave",function(){ if(!op && hover){ hover=null; render(); } });
+
+  // ---- Tab (held) flips marker snapping during a drag ----
+  document.addEventListener("keydown",function(e){ if(e.key!=="Tab") return;
+    var ae=document.activeElement; if(ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.tagName==="SELECT")) return;   // let Tab traverse form fields
+    if(mode==="marker"){ e.preventDefault(); cycleMarkerStyle(); return; }   // Marker mode: Tab cycles the numbering method for the next marker
+    tabDown=true; if(op) e.preventDefault(); });                             // Select mode: Tab (held) flips marker snapping during a drag
+  document.addEventListener("keyup",function(e){ if(e.key==="Tab") tabDown=false; });
+  window.addEventListener("blur",function(){ tabDown=false; });
+
+  // ---- wheel over a selected marker: adjust its number (up = +1, down = -1) ----
+  ov.addEventListener("wheel",function(e){
+    if(!natW) return;
+    if(e.ctrlKey||e.metaKey||e.shiftKey) return;   // modified wheel is zoom -> let it bubble to the drop handler
+    var g=e.target.closest?e.target.closest("[data-id]"):null; if(!g) return;
+    var it=byId(g.dataset.id); if(!it||it.kind!=="marker"||!isSel(it.id)) return;
+    e.preventDefault();
+    it.num=Math.max(it.style==="alpha"?1:0,(parseInt(it.num,10)||0)+(e.deltaY<0?1:-1));
+    render(); commitSoon();
+  },{passive:false});
+
+  // ---- Ctrl + wheel = zoom (intercepted so the browser doesn't page-zoom); Shift + wheel = scroll sideways ----
+  drop.addEventListener("wheel",function(e){
+    if(!natW) return;
+    if(e.ctrlKey||e.metaKey){ e.preventDefault(); zoomAtCursor(e, e.deltaY<0?1.1:1/1.1); }
+    else if(e.shiftKey){ e.preventDefault(); drop.scrollLeft += (e.deltaY!==0?e.deltaY:e.deltaX); }
+  },{passive:false});
+  $("zoomSel").addEventListener("change",function(){
+    var v=this.value; if(v==="fit") zoomScale=null; else if(v!=="custom") zoomScale=parseFloat(v);
+    render(); updateZoomUI(); centerView();
+  });
+
+  // ---- list interactions (shift/ctrl = multi) ----
+  $("list").addEventListener("click",function(e){
+    var d=e.target.dataset.del; if(d){ e.stopPropagation(); del(d); return; }
+    var row=e.target.closest("[data-row]"); if(!row) return; var id=row.dataset.row;
+    if(e.shiftKey||e.ctrlKey||e.metaKey) toggleSel(id); else selectOne(id);
+    render();
+  });
+
+  // ---- context menu ----
+  var ctx=null;
+  function hideMenu(){ if(ctx){ ctx.remove(); ctx=null; } }
+  function showMenu(x,y,rows){ hideMenu(); ctx=document.createElement("div"); ctx.className="ctxmenu";
+    rows.forEach(function(r){ if(r==="sep"){ var s=document.createElement("div"); s.className="sep"; ctx.appendChild(s); return; }
+      var b=document.createElement("button"); b.appendChild(document.createTextNode(r.label));
+      if(r.hint){ var kk=document.createElement("span"); kk.className="k"; kk.textContent=r.hint; b.appendChild(kk); }
+      b.addEventListener("click",function(){ hideMenu(); r.fn(); }); ctx.appendChild(b); });
+    document.body.appendChild(ctx);
+    ctx.style.left=Math.max(4,Math.min(x,window.innerWidth -ctx.offsetWidth -6))+"px";
+    ctx.style.top =Math.max(4,Math.min(y,window.innerHeight-ctx.offsetHeight-6))+"px";
+  }
+  ov.addEventListener("contextmenu",function(e){
+    if(!natW) return; e.preventDefault();
+    var p=toNorm(e), g=e.target.closest?e.target.closest("[data-id]"):null, rows;
+    if(g){ var id=g.dataset.id; if(!isSel(id)){ selectOne(id); } render();
+      if(selItems().length>=2){
+        rows=[ {label:"Align left",fn:function(){align("left");}},
+               {label:"Align centre (H)",fn:function(){align("hcenter");}},
+               {label:"Align right",fn:function(){align("right");}}, "sep",
+               {label:"Align top",fn:function(){align("top");}},
+               {label:"Align middle (V)",fn:function(){align("vmiddle");}},
+               {label:"Align bottom",fn:function(){align("bottom");}}, "sep",
+               {label:"Same width",fn:function(){equalize("width");}},
+               {label:"Same height",fn:function(){equalize("height");}}, "sep",
+               {label:"Delete",hint:"X",fn:function(){delSel();}} ];
+      } else {
+        rows=[ {label:"Delete",hint:"X",fn:function(){delSel();}},
+               {label:"Duplicate",fn:function(){duplicate(id);}}, "sep",
+               {label:"Bring to front",fn:function(){toFront(id);}},
+               {label:"Send to back",fn:function(){toBack(id);}} ];
+      }
+    } else {
+      rows=[ {label:"Add marker here",fn:function(){addMarkerAt(p.x,p.y);}}, "sep",
+             {label:"Clear all",fn:function(){items=[]; clearSel(); render();}} ];
+    }
+    showMenu(e.clientX,e.clientY,rows);
+  });
+  document.addEventListener("pointerdown",function(e){ if(ctx && !ctx.contains(e.target)) hideMenu(); }, true);
+  window.addEventListener("scroll",hideMenu,true);
+  window.addEventListener("blur",hideMenu);
+
+  // ---- keyboard ----
+  var SHORTCUTS={ s:"select", q:"marker", r:"rect", c:"circle", a:"arrow", d:"line" };
+  document.addEventListener("keydown",function(e){
+    if(!$("cropModal").hidden) return;                    // crop modal has its own keys (Esc/Enter/Space)
+    if(e.key==="Escape"){ hideMenu(); }
+    var typing=document.activeElement.tagName==="INPUT"||document.activeElement.tagName==="TEXTAREA";
+    if(typing) return;                                    // in a field: let the browser do native text undo/redo
+    if((e.ctrlKey||e.metaKey) && !e.altKey){ var ck=e.key.toLowerCase();
+      if(ck==="z" && !e.shiftKey){ undo(); e.preventDefault(); return; }
+      if(ck==="y" || (ck==="z"&&e.shiftKey)){ redo(); e.preventDefault(); return; } }
+    // arrow-key nudge of the selection (Shift = bigger, Alt = smaller). Handled before the Alt early-return below.
+    if(natW && selIds.length && (e.key==="ArrowLeft"||e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="ArrowDown") && !e.ctrlKey && !e.metaKey){
+      var stepPx=e.shiftKey?10:(e.altKey?0.5:2), dx=0, dy=0;
+      if(e.key==="ArrowLeft") dx=-stepPx; else if(e.key==="ArrowRight") dx=stepPx;
+      else if(e.key==="ArrowUp") dy=-stepPx; else dy=stepPx;
+      selItems().forEach(function(it){ translate(it, dx/natW, dy/natH); });
+      render(); commitSoon(); e.preventDefault(); return;
+    }
+    if(e.ctrlKey||e.metaKey||e.altKey) return;            // leave other Ctrl/Cmd/Alt combos (cut, select-all, save) alone
+    var k=e.key.toLowerCase();
+    if((e.key==="Delete"||e.key==="Backspace"||k==="x") && selIds.length){ delSel(); e.preventDefault(); return; }
+    var m=SHORTCUTS[k]; if(m){ setMode(m); e.preventDefault(); }
+  });
+
+  // ---- controls ----
+  $("tools").addEventListener("click",function(e){ if(e.target.dataset.mode) setMode(e.target.dataset.mode); });
+  $("arrange").addEventListener("click",function(e){ var a=e.target.dataset.align; if(a){ align(a); return; }
+    var q=e.target.dataset.eq; if(q){ equalize(q); } });
+  $("color").addEventListener("input",function(){ curColor=this.value; selItems().forEach(function(it){ it.color=curColor; }); render(); });
+  $("color").addEventListener("change",function(){ commit(); });   // one history step when the picker closes
+  (function(){ var sw=["#e5484d","#d6a320","#2f7d6b","#4a6b8a","#6a5aa0","#111111"], box=$("swatches");
+    box.innerHTML=sw.map(function(c){ return '<button data-c="'+c+'" style="background:'+c+'"></button>'; }).join("");
+    box.addEventListener("click",function(e){ var c=e.target.dataset.c; if(!c) return; curColor=c; $("color").value=c;
+      selItems().forEach(function(it){ it.color=c; }); render(); commit(); }); })();
+  $("next").addEventListener("input",function(){ var n=parseField(markerStyle,this.value); if(n!=null){ if(markerStyle==="alpha") nextAlpha=n; else nextNum=n; } });
+  $("mstyle").addEventListener("change",function(){ markerStyle=(this.value==="alpha")?"alpha":"numeric"; syncNext(); });
+  $("mupper").addEventListener("change",function(){ markerUpper=this.checked; syncNext(); render(); commit(); });   // recases every alpha marker
+  $("msize").addEventListener("input",function(){ var v=parseFloat(this.value); if(!isNaN(v)&&v>0){ markerScale=v; render(); commitSoon(); } });
+  $("asize").addEventListener("input",function(){ var v=parseFloat(this.value); if(!isNaN(v)&&v>0){ annotScale=v; render(); commitSoon(); } });
+  $("sel-num").addEventListener("input",function(){ var it=sel(); if(it&&it.kind==="marker"){ var n=parseField(it.style||"numeric",this.value); if(n!=null){ it.num=n; render(); commitSoon(); } } });
+  function wheelNumber(e){ e.preventDefault(); var inp=e.currentTarget;
+    var step=parseFloat(inp.step)||1, mn=parseFloat(inp.min); if(isNaN(mn)) mn=-Infinity;
+    var v=parseFloat(inp.value); if(isNaN(v)) v=0; v+=(e.deltaY<0?step:-step);
+    var dec=(String(step).split(".")[1]||"").length; v=parseFloat(v.toFixed(dec));
+    inp.value=Math.max(mn,v); inp.dispatchEvent(new Event("input",{bubbles:true})); }
+  $("next").addEventListener("wheel",function(e){ e.preventDefault(); var d=e.deltaY<0?1:-1;
+    if(markerStyle==="alpha") nextAlpha=Math.max(1,nextAlpha+d); else nextNum=Math.max(0,nextNum+d); syncNext(); },{passive:false});
+  $("sel-num").addEventListener("wheel",function(e){ e.preventDefault(); var it=sel(); if(!it||it.kind!=="marker") return; var d=e.deltaY<0?1:-1;
+    it.num=Math.max(it.style==="alpha"?1:0,(parseInt(it.num,10)||0)+d); $("sel-num").value=fieldLabel(it.style||"numeric",it.num); render(); commitSoon(); },{passive:false});
+  $("msize").addEventListener("wheel",wheelNumber,{passive:false});
+  $("asize").addEventListener("wheel",wheelNumber,{passive:false});
+  $("snap").addEventListener("change",function(){ snapOn=this.checked; });
+  // ---- interface theme (light/dark) — purely cosmetic; never touches annotation colours or the export ----
+  (function(){ var KEY="ptools.theme", mq=window.matchMedia?window.matchMedia("(prefers-color-scheme: dark)"):null;
+    var SUN='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.3M12 19.1v2.3M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.6 12h2.3M19.1 12h2.3M4.4 19.6l1.6-1.6M18 6l1.6-1.6"/></svg>';
+    var MOON='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 13.2A8.3 8.3 0 1 1 10.8 3.5 6.5 6.5 0 0 0 20.5 13.2z"/></svg>';
+    function stored(){ try{ return localStorage.getItem(KEY); }catch(e){ return null; } }
+    function effective(){ var s=stored(); return (s==="dark"||s==="light") ? s : (mq&&mq.matches?"dark":"light"); }
+    function apply(theme){ var r=document.documentElement;
+      if(theme==="dark"||theme==="light") r.setAttribute("data-theme",theme); else r.removeAttribute("data-theme");
+      var eff=effective(), b=$("themeBtn");
+      if(b){ b.innerHTML = eff==="dark" ? MOON : SUN;
+        b.title = (eff==="dark" ? "Switch to light interface" : "Switch to dark interface") + " — annotation colours and the export are unaffected"; } }
+    apply(stored());
+    $("themeBtn").addEventListener("click",function(){ var next=effective()==="dark"?"light":"dark";
+      try{ localStorage.setItem(KEY,next); }catch(e){} apply(next); });
+    if(mq){ try{ mq.addEventListener("change",function(){ if(!stored()) apply(null); }); }catch(e){} }   // follow the OS when the user hasn't chosen
+    // the theme is shared across the tools on this origin
+    window.addEventListener("storage",function(e){ if(e.key===KEY||e.key===null) apply(stored()); });
+    // a page restored from the back/forward cache, or a tab the browser froze,
+    // never received the storage event, so re-read the key when it comes back
+    window.addEventListener("pageshow",function(e){ if(e.persisted) apply(stored()); });
+    document.addEventListener("visibilitychange",function(){
+      if(document.visibilityState==="visible") apply(stored());
+    });
+  })();
+  $("src").addEventListener("input",emit); $("alt").addEventListener("input",emit);
+  $("clear").addEventListener("click",function(){ items=[]; clearSel(); render(); commit(); });   // counters are kept in sync by the Next field, no need to re-read
+  $("undoBtn").addEventListener("click",undo);
+  $("redoBtn").addEventListener("click",redo);
+  $("copy").addEventListener("click",function(){ var o=$("out"); if(!o.value) return; o.select();
+    navigator.clipboard?navigator.clipboard.writeText(o.value):document.execCommand("copy");
+    var b=this,t=b.textContent; b.textContent="Copied!"; setTimeout(function(){ b.textContent=t; },1200); });
+
+  // Self-contained SVG: screenshot embedded (base64) + annotations -> renders inline AND when GLightbox loads the file.
+  function figureSVG(){
+    if(!natW||!imgDataURL) return "";
+    var defs=defsXML(), lines=items.map(function(it){ return "  "+elXML(it); });
+    return '<svg xmlns="'+SVGNS+'" viewBox="0 0 '+natW+' '+natH+'" width="'+natW+'" height="'+natH+'" data-au="'+unit().toFixed(2)+'">\n'
+      +'  <image href="'+imgDataURL+'" x="0" y="0" width="'+natW+'" height="'+natH+'"/>\n'
+      +(defs?"  "+defs+"\n":"")+(lines.length?lines.join("\n")+"\n":"")+'</svg>\n';
+  }
+  $("svgdl").addEventListener("click",function(){
+    var svg=figureSVG(); if(!svg){ alert("Load an image first."); return; }
+    var name=(($("src").value.trim().split("/").pop())||"annotation").replace(/\.[^.]+$/,"")+".svg";
+    var blob=new Blob([svg],{type:"image/svg+xml"}), u=URL.createObjectURL(blob);
+    var a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ a.remove(); URL.revokeObjectURL(u); },0);
+  });
+
+  // ---- image load ----
+  function setSrcName(name){ var cur=$("src").value.trim(), dir;   // update filename, keep any folder the user set
+    if(cur){ var i=cur.lastIndexOf("/"); dir=i>=0?cur.slice(0,i+1):""; } else dir="images/"; if(name) $("src").value=dir+name; }
+  function loadFile(file){ if(!file) return;
+    var isSVG = file.type==="image/svg+xml" || /\.svg$/i.test(file.name||"");
+    if(!isSVG && !/^image\//.test(file.type)) return;
+    if(isSVG){ var frt=new FileReader(); frt.onload=function(){ loadSVGText(frt.result, file.name); }; frt.readAsText(file); return; }
+    var fr=new FileReader();
+    fr.onload=function(){ imgDataURL=fr.result;                 // keep base64 for the self-contained SVG export
+      annotDPR=(window.devicePixelRatio||1);                   // DPI of this screenshot's source display
+      img.onload=function(){ natW=img.naturalWidth; natH=img.naturalHeight; frame.hidden=false; hint.style.display="none";
+        curImgId=putImage(imgDataURL,natW,natH); setSrcName(file.name); zoomScale=null;
+        render(); updateZoomUI(); saveImage(); saveState(); resetHistory(); };
+      img.src=imgDataURL; };
+    fr.readAsDataURL(file); }
+  // Re-import a tool-made SVG: pull the embedded screenshot + the annotation elements back into editable items.
+  function loadSVGText(text, filename){
+    annotDPR=(window.devicePixelRatio||1);   // applyImported solves annotScale against this so unit() matches data-au exactly
+    var vb=text.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/i), W=vb?parseFloat(vb[1]):0, H=vb?parseFloat(vb[2]):0;
+    if(!W||!H){ var wm=text.match(/\bwidth="([\d.]+)"/i), hm=text.match(/\bheight="([\d.]+)"/i); if(wm&&hm){ W=parseFloat(wm[1]); H=parseFloat(hm[1]); } }
+    var im=text.match(/<image[^>]*?(?:xlink:href|href)="([^"]+)"/i);
+    if(im && im[1]){
+      imgDataURL=im[1];
+      img.onload=function(){ natW=img.naturalWidth; natH=img.naturalHeight; frame.hidden=false; hint.style.display="none";
+        curImgId=putImage(imgDataURL,natW,natH);
+        var got=parseAnnotations(text, W||natW, H||natH);
+        if(got.length) applyImported(got, text, W||natW, H||natH); else { items=[]; clearSel(); }
+        setSrcName(filename); zoomScale=null; render(); updateZoomUI(); saveImage(); saveState(); resetHistory(); };
+      img.src=imgDataURL; return;
+    }
+    if(!natW){ alert("This SVG has no embedded image. Load a screenshot first, then import the SVG over it."); return; }
+    var got2=parseAnnotations(text, W||natW, H||natH);
+    if(got2.length){ applyImported(got2, text, W||natW, H||natH); render(); commit(); }
+    else alert("No annotations found in this SVG.");
+  }
+  $("file").addEventListener("change",function(e){ loadFile(e.target.files[0]); });
+  ["dragenter","dragover"].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add("drag"); }); });
+  ["dragleave","drop"].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.remove("drag"); }); });
+  drop.addEventListener("drop",function(e){ if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+
+  // ---- persistence (localStorage): keep the image + edits across reloads ----
+  var LSK_IMG="ptools.annotate.img", LSK_STATE="ptools.annotate.state";
+  var saveTimer=null, imgPersisted=false, warnedQuota=false;
+  function lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+  function saveImage(){ if(!imgDataURL){ imgPersisted=false; return; }
+    imgPersisted=lsSet(LSK_IMG, JSON.stringify({img:imgDataURL}));
+    if(!imgPersisted && !warnedQuota){ warnedQuota=true; lsDel(LSK_STATE);
+      alert("This image is too large to save for reload (browser storage limit) — edits won't persist."); } }
+  function saveState(){ if(!imgPersisted) return;
+    lsSet(LSK_STATE, JSON.stringify({items:items,nextNum:nextNum,nextAlpha:nextAlpha,markerStyle:markerStyle,markerUpper:markerUpper,curColor:curColor,markerScale:markerScale,annotScale:annotScale,annotDPR:annotDPR,uidN:uidN,src:$("src").value,alt:$("alt").value})); }
+  function scheduleSave(){ if(saveTimer) clearTimeout(saveTimer); saveTimer=setTimeout(saveState,350); }
+
+  // ---- undo / redo: snapshot history of document content (items + marker size) ----
+  var hist=[], hi=-1, HIST_MAX=120, commitTimer=null;
+  function docSnapshot(){ return JSON.stringify({items:items, markerScale:markerScale, annotScale:annotScale, markerUpper:markerUpper, img:curImgId}); }
+  function commit(){ var s=docSnapshot(); if(hi>=0 && hist[hi]===s) return;   // dedup: no entry if nothing changed
+    hist=hist.slice(0,hi+1); hist.push(s); if(hist.length>HIST_MAX) hist.shift(); hi=hist.length-1; updateUndoUI(); }
+  function commitSoon(){ if(commitTimer) clearTimeout(commitTimer); commitTimer=setTimeout(function(){ commitTimer=null; commit(); },350); }
+  function applyDoc(s){ var st; try{ st=JSON.parse(s); }catch(e){ return; }
+    if(st.img!=null && st.img!==curImgId && imgStore[st.img]){   // crop step: swap back/forward to that image version
+      var im=imgStore[st.img]; curImgId=st.img; imgDataURL=im.url; natW=im.w; natH=im.h; img.src=imgDataURL; saveImage(); }
+    items=st.items||[]; if(st.markerScale) markerScale=st.markerScale; if(st.annotScale) annotScale=st.annotScale;
+    if(st.markerUpper!=null){ markerUpper=st.markerUpper; var mu=$("mupper"); if(mu) mu.checked=markerUpper; }
+    selIds=selIds.filter(function(id){ return byId(id); });   // drop selection of items that no longer exist
+    $("msize").value=markerScale; $("asize").value=Math.round(annotScale*100)/100; syncNext(); render(); saveState(); updateUndoUI(); }
+  function undo(){ if(commitTimer){ clearTimeout(commitTimer); commitTimer=null; commit(); } if(hi<=0) return; hi--; applyDoc(hist[hi]); }
+  function redo(){ if(hi>=hist.length-1) return; hi++; applyDoc(hist[hi]); }
+  function resetHistory(){ hist=[]; hi=-1; commit(); }
+  function updateUndoUI(){ var u=$("undoBtn"), r=$("redoBtn");
+    if(u){ u.disabled=hi<=0; u.style.opacity=hi<=0?.45:1; }
+    if(r){ var none=hi>=hist.length-1; r.disabled=none; r.style.opacity=none?.45:1; } }
+  function restore(){
+    var raw=lsGet(LSK_IMG); if(!raw) return; var I; try{ I=JSON.parse(raw); }catch(e){ return; }
+    if(!I||!I.img) return; imgDataURL=I.img; imgPersisted=true;
+    var s=lsGet(LSK_STATE); if(s){ try{ var st=JSON.parse(s);
+      if(Array.isArray(st.items)) items=st.items;
+      if(st.nextNum!=null) nextNum=st.nextNum;
+      if(st.nextAlpha!=null) nextAlpha=st.nextAlpha;
+      if(st.markerStyle) markerStyle=st.markerStyle;
+      if(st.markerUpper!=null) markerUpper=st.markerUpper;
+      if(st.curColor) curColor=st.curColor;
+      if(st.markerScale) markerScale=st.markerScale;
+      if(st.annotScale) annotScale=st.annotScale;
+      if(st.annotDPR) annotDPR=st.annotDPR;
+      if(st.uidN!=null) uidN=st.uidN;
+      if(st.src!=null) $("src").value=st.src;
+      if(st.alt!=null) $("alt").value=st.alt;
+      $("mstyle").value=markerStyle; $("mupper").checked=markerUpper; syncNext(); $("msize").value=markerScale; $("asize").value=Math.round(annotScale*100)/100; if(/^#/.test(curColor)) $("color").value=curColor;
+    }catch(e){} }
+    img.onload=function(){ natW=img.naturalWidth; natH=img.naturalHeight; frame.hidden=false; hint.style.display="none";
+      curImgId=putImage(imgDataURL,natW,natH); zoomScale=null; render(); updateZoomUI(); };
+    img.src=imgDataURL;
+  }
+  $("reset").addEventListener("click",function(){
+    if(!confirm("Remove the image and all annotations, and clear the saved copy?")) return;
+    lsDel(LSK_IMG); lsDel(LSK_STATE); imgPersisted=false;
+    items=[]; clearSel(); imgDataURL=""; natW=0; natH=0; nextNum=1; nextAlpha=1; markerStyle="numeric"; markerUpper=false;
+    imgStore={}; imgSeq=0; curImgId=null; annotScale=1; annotDPR=(window.devicePixelRatio||1); $("asize").value=1;
+    $("mstyle").value="numeric"; $("mupper").checked=false; syncNext(); $("src").value=""; $("alt").value=""; img.removeAttribute("src");
+    zoomScale=null; frame.hidden=true; hint.style.display=""; render(); updateZoomUI(); resetHistory();
+  });
+
+  // ---- import (best effort) ----
+  // Parse annotation elements out of exported HTML/SVG, normalized by the viewBox W×H. Shared by Import and SVG drag-in.
+  function parseAnnotations(text, W, H){
+    var got=[], re, g;
+    re=/<rect[^>]*\bx="([\d.]+)"[^>]*\by="([\d.]+)"[^>]*\bwidth="([\d.]+)"[^>]*\bheight="([\d.]+)"[^>]*stroke="([^"]*)"[^>]*\/>/gi;
+    while((g=re.exec(text))) got.push({kind:"rect",id:uid(),color:g[5],x:+g[1]/W,y:+g[2]/H,w:+g[3]/W,h:+g[4]/H});
+    re=/<ellipse[^>]*cx="([\d.]+)"[^>]*cy="([\d.]+)"[^>]*rx="([\d.]+)"[^>]*ry="([\d.]+)"[^>]*stroke="([^"]*)"/gi;
+    while((g=re.exec(text))) got.push({kind:"circle",id:uid(),color:g[5],x:(g[1]-g[3])/W,y:(g[2]-g[4])/H,w:2*g[3]/W,h:2*g[4]/H});
+    re=/<line\b[^>]*>/gi;            // <line> with a marker-end is an arrow, without one it's a plain line
+    while((g=re.exec(text))){ var tg=g[0],
+      a1=tg.match(/x1="([\d.]+)"/), b1=tg.match(/y1="([\d.]+)"/), a2=tg.match(/x2="([\d.]+)"/), b2=tg.match(/y2="([\d.]+)"/), cc=tg.match(/stroke="([^"]*)"/);
+      if(a1&&b1&&a2&&b2) got.push({kind:/marker-end/.test(tg)?"arrow":"line",id:uid(),color:cc?cc[1]:"#e5484d",x1:+a1[1]/W,y1:+b1[1]/H,x2:+a2[1]/W,y2:+b2[1]/H}); }
+    re=/<circle[^>]*cx="([\d.]+)"[^>]*cy="([\d.]+)"[^>]*r="[\d.]+"[^>]*fill="([^"]*)"[^>]*\/>\s*<text[^>]*>([0-9A-Za-z]+)<\/text>/gi;
+    lastParseUpper=null;
+    while((g=re.exec(text))){ var raw=g[4], st, num;
+      if(/^\d+$/.test(raw)){ st="numeric"; num=+raw; }
+      else { var a=alphaToNum(raw); if(a==null) continue; st="alpha"; num=a;   // letters -> ordinal; remember the case seen
+        if(/[A-Z]/.test(raw)) lastParseUpper=true; else if(lastParseUpper==null) lastParseUpper=false; }
+      got.push({kind:"marker",id:uid(),color:g[3],x:+g[1]/W,y:+g[2]/H,num:num,style:st}); }
+    return got;
+  }
+  function applyImported(got, text, W, H){
+    items=got; clearSel();
+    var mn=0, ma=0; items.forEach(function(it){ if(it.kind==="marker"){ if(it.style==="alpha"){ if(it.num>=ma) ma=it.num+1; } else { if(it.num>=mn) mn=it.num+1; } } });
+    if(mn) nextNum=mn; if(ma) nextAlpha=ma;
+    if(lastParseUpper!=null){ markerUpper=lastParseUpper; var mu=$("mupper"); if(mu) mu.checked=markerUpper; }
+    syncNext();
+    if(text && W && H){
+      // exact recovery: tool-made files carry data-au (the unit at export). unit()=natW*annotScale and natW==W after
+      // import, so annotScale=data-au/W reproduces the baked unit EXACTLY -- works for width-relative AND older DPI files.
+      var au=text.match(/data-au="([\d.]+)"/i), unitExport;
+      if(au){ unitExport=parseFloat(au[1]); var as=W?unitExport/W:0;
+        if(as>0.05 && as<50){ annotScale=as; $("asize").value=Math.round(as*100)/100; } }
+      var mr=text.match(/<circle[^>]*r="([\d.]+)"[^>]*\/>\s*<text/i);
+      if(mr){ var base=unitExport||(Math.min(W,H)); var ms=parseFloat(mr[1])/(base*0.036);
+        if(ms>0.1&&ms<10){ markerScale=ms; $("msize").value=Math.round(ms*100)/100; } }
+    }
+  }
+  $("importBtn").addEventListener("click",function(){
+    var text=prompt("Paste an existing <div class=\"annot\"> block:"); if(!text) return; var m;
+    m=text.match(/<img[^>]*\bsrc="([^"]*)"/i); if(m) $("src").value=m[1];
+    m=text.match(/<img[^>]*\balt="([^"]*)"/i); if(m) $("alt").value=m[1];
+    var vb=text.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/i), W=vb?parseFloat(vb[1]):natW, H=vb?parseFloat(vb[2]):natH;
+    if(!W||!H){ alert("Load the image first (for its dimensions)."); return; }
+    var got=parseAnnotations(text,W,H);
+    if(got.length){ applyImported(got,text,W,H); render(); commit(); }
+    else alert("No annotations found in that snippet.");
+  });
+
+  // ---- normalize existing exports: re-scale baked sizes to a common target, without the tool's single canvas ----
+  // unit()=natW*annotScale, so equal on-screen size across images means equal unit/natW = T. Each file's new unit is
+  // W*T (W=viewBox width=natW), a uniform factor f=W*T/data-au on every size attribute. Positions/geometry/image stay put.
+  function rescaleAnnotSVG(svgStr, T){
+    var doc; try{ doc=new DOMParser().parseFromString(svgStr,"image/svg+xml"); }catch(e){ return null; }
+    if(!doc||doc.getElementsByTagName("parsererror").length) return null;
+    var svg=doc.documentElement; if(!svg||svg.nodeName.toLowerCase()!=="svg") return null;
+    var W=0, vb=(svg.getAttribute("viewBox")||"").trim().split(/[\s,]+/);
+    if(vb.length===4) W=parseFloat(vb[2]); if(!(W>0)) W=parseFloat(svg.getAttribute("width"));
+    var au=parseFloat(svg.getAttribute("data-au"));
+    if(!(W>0)||!(au>0)) return null;                 // not a tool-made file (no data-au) -> cannot normalize exactly
+    var newUnit=W*T, f=newUnit/au; if(!(f>0)||!isFinite(f)) return null;
+    function sc(el,name){ var v=parseFloat(el.getAttribute(name)); if(!isNaN(v)) el.setAttribute(name,(v*f).toFixed(2)); }
+    var all=svg.getElementsByTagName("*");
+    for(var i=0;i<all.length;i++){ var el=all[i], tag=el.nodeName.toLowerCase();
+      if(el.hasAttribute("stroke-width")) sc(el,"stroke-width");
+      if(el.hasAttribute("stroke-dasharray")){ var da=el.getAttribute("stroke-dasharray").split(/[\s,]+/).map(function(x){ var n=parseFloat(x); return isNaN(n)?x:(n*f).toFixed(2); }).join(" "); el.setAttribute("stroke-dasharray",da); }
+      if(tag==="circle") sc(el,"r");                 // marker dot (drawn circles are <ellipse>, left alone)
+      else if(tag==="text"){ if(el.hasAttribute("font-size")) sc(el,"font-size"); }
+      else if(tag==="rect"){ if(el.hasAttribute("rx")) sc(el,"rx"); if(el.hasAttribute("ry")) sc(el,"ry"); }
+      // <ellipse> rx/ry, <line> coords, <image>, and all x/y/cx/cy positions are geometry -> untouched
+    }
+    svg.setAttribute("data-au", newUnit.toFixed(2));
+    return { svg:new XMLSerializer().serializeToString(svg), oldUnit:au, newUnit:newUnit, W:W };
+  }
+  function normalizeText(text, T){
+    var m=text.match(/<svg[\s\S]*?<\/svg>/i); if(!m) return null;   // works for a bare .svg file and for a <div class="annot"> snippet
+    var r=rescaleAnnotSVG(m[0], T); if(!r) return null;
+    r.text = text.slice(0,m.index)+r.svg+text.slice(m.index+m[0].length);
+    return r;
+  }
+  function normTarget(){ var v=parseFloat($("normT").value); return (v>0&&isFinite(v))?v:1; }
+  var normURLs=[];   // object URLs created for download links, revoked on Clear so they don't leak
+  function clearNormList(){ normURLs.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(e){} }); normURLs=[]; $("normLog").innerHTML=""; }
+  $("normPick").addEventListener("click",function(){ $("normFiles").value=""; $("normFiles").click(); });
+  $("normClear").addEventListener("click",clearNormList);
+  $("normFiles").addEventListener("change",function(){
+    var files=Array.prototype.slice.call(this.files||[]), T=normTarget(), log=$("normLog");   // append, so repeated picks accumulate; Clear list empties it
+    if(!files.length) return;
+    files.forEach(function(file){
+      var fr=new FileReader();
+      fr.onload=function(){
+        var r=normalizeText(fr.result, T), row=document.createElement("div"); row.style.margin="3px 0";
+        if(!r){ row.textContent="✗ "+file.name+" — no data-au found (not a tool-made SVG, or no annotations); skipped."; log.appendChild(row); return; }
+        var blob=new Blob([r.text],{type:"image/svg+xml"}), u=URL.createObjectURL(blob); normURLs.push(u);
+        var a=document.createElement("a");
+        a.href=u; a.download=file.name; a.textContent="⤓ "+file.name; a.style.fontWeight="600";
+        row.appendChild(a);
+        var pct=(T*0.036*100).toFixed(1);
+        row.appendChild(document.createTextNode("  — unit "+r.oldUnit.toFixed(0)+" → "+r.newUnit.toFixed(0)+" (marks ≈ "+pct+"% of width)"));
+        log.appendChild(row);
+      };
+      fr.readAsText(file);
+    });
+  });
+  $("normRun").addEventListener("click",function(){
+    var src=$("normIn").value.trim(); if(!src){ $("normOut").value=""; return; }
+    var r=normalizeText(src, normTarget());
+    if(!r){ $("normOut").value=""; alert("No tool-made <svg> with a data-au found in that snippet."); return; }
+    $("normOut").value=r.text; $("normOut").focus(); $("normOut").select();
+  });
+
+  // ---- crop: zoomable lightbox, removes pixels (re-rasters), re-maps annotations, undoable ----
+  (function(){
+    var modal=$("cropModal"), stage=$("cropStage"), cimg=$("cropImg"), hole=$("cropHole"), readout=$("cropReadout");
+    var view={scale:1,tx:0,ty:0}, crop={x:0,y:0,w:0,h:0}, cop=null, spaceDown=false, handles={};
+    var HPOS={nw:[0,0],n:[50,0],ne:[100,0],e:[100,50],se:[100,100],s:[50,100],sw:[0,100],w:[0,50]};
+    function hcur(k){ return (k==="n"||k==="s")?"ns-resize":(k==="e"||k==="w")?"ew-resize":(k==="ne"||k==="sw")?"nesw-resize":"nwse-resize"; }
+    Object.keys(HPOS).forEach(function(k){ var d=document.createElement("div"); d.className="crophandle"; d.dataset.h=k;
+      d.style.left=HPOS[k][0]+"%"; d.style.top=HPOS[k][1]+"%"; d.style.cursor=hcur(k); hole.appendChild(d); handles[k]=d; });
+    function srect(){ return stage.getBoundingClientRect(); }
+    function toStage(e){ var r=srect(); return {sx:e.clientX-r.left, sy:e.clientY-r.top}; }
+    function imgFromStage(sx,sy){ return {x:(sx-view.tx)/view.scale, y:(sy-view.ty)/view.scale}; }
+    function fitScale(){ var r=srect(); return Math.min(r.width/natW, r.height/natH)*0.92; }
+    function fitView(){ var r=srect(); view.scale=fitScale(); view.tx=(r.width-natW*view.scale)/2; view.ty=(r.height-natH*view.scale)/2; cropRender(); }
+    function clampCrop(){ crop.w=Math.max(1,Math.min(crop.w,natW)); crop.h=Math.max(1,Math.min(crop.h,natH));
+      crop.x=Math.max(0,Math.min(crop.x,natW-crop.w)); crop.y=Math.max(0,Math.min(crop.y,natH-crop.h)); }
+    function cropRender(){
+      cimg.style.width=(natW*view.scale)+"px"; cimg.style.height=(natH*view.scale)+"px";
+      cimg.style.transform="translate("+view.tx+"px,"+view.ty+"px)";
+      var sx=view.tx+crop.x*view.scale, sy=view.ty+crop.y*view.scale;
+      hole.hidden=false; hole.style.left=sx+"px"; hole.style.top=sy+"px";
+      hole.style.width=(crop.w*view.scale)+"px"; hole.style.height=(crop.h*view.scale)+"px";
+      readout.textContent=Math.round(crop.w)+" × "+Math.round(crop.h)+" px  ·  "+Math.round(view.scale*100)+"%";
+    }
+    function zoomAt(cs,f){ var ip=imgFromStage(cs.sx,cs.sy), ns=Math.max(fitScale()*0.1, Math.min(64, view.scale*f));
+      view.tx=cs.sx-ip.x*ns; view.ty=cs.sy-ip.y*ns; view.scale=ns; cropRender(); }
+    function openCrop(){ if(!natW||!imgDataURL){ alert("Load an image first."); return; }
+      cimg.src=imgDataURL; crop={x:0,y:0,w:natW,h:natH}; modal.hidden=false; requestAnimationFrame(fitView); }
+    function closeCrop(){ modal.hidden=true; cop=null; stage.classList.remove("panning"); }
+    function doApply(){ applyCrop({x:crop.x,y:crop.y,w:crop.w,h:crop.h}); closeCrop(); }
+
+    stage.addEventListener("wheel",function(e){ e.preventDefault(); zoomAt(toStage(e), e.deltaY<0?1.1:1/1.1); },{passive:false});
+    stage.addEventListener("pointerdown",function(e){
+      e.preventDefault(); var cs=toStage(e), ip=imgFromStage(cs.sx,cs.sy), t=e.target;
+      if(spaceDown || e.button===1){ cop={kind:"pan",cs:cs,tx0:view.tx,ty0:view.ty}; stage.classList.add("panning"); }
+      else if(t.dataset && t.dataset.h){ cop={kind:"resize",h:t.dataset.h,orig:{x:crop.x,y:crop.y,w:crop.w,h:crop.h}}; }
+      else if(ip.x>=crop.x&&ip.x<=crop.x+crop.w&&ip.y>=crop.y&&ip.y<=crop.y+crop.h){ cop={kind:"move",ip0:ip,orig:{x:crop.x,y:crop.y}}; }
+      else { crop.x=Math.max(0,Math.min(ip.x,natW)); crop.y=Math.max(0,Math.min(ip.y,natH)); crop.w=1; crop.h=1; cop={kind:"new",ox:crop.x,oy:crop.y}; }
+      try{ stage.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    stage.addEventListener("pointermove",function(e){ if(!cop) return; var cs=toStage(e), ip=imgFromStage(cs.sx,cs.sy);
+      if(cop.kind==="pan"){ view.tx=cop.tx0+(cs.sx-cop.cs.sx); view.ty=cop.ty0+(cs.sy-cop.cs.sy); cropRender(); return; }
+      if(cop.kind==="move"){ crop.x=cop.orig.x+(ip.x-cop.ip0.x); crop.y=cop.orig.y+(ip.y-cop.ip0.y); clampCrop(); cropRender(); return; }
+      if(cop.kind==="new"){ var l=Math.min(cop.ox,ip.x),r=Math.max(cop.ox,ip.x),t=Math.min(cop.oy,ip.y),b=Math.max(cop.oy,ip.y);
+        crop.x=l; crop.y=t; crop.w=r-l; crop.h=b-t; clampCrop(); cropRender(); return; }
+      if(cop.kind==="resize"){ var o=cop.orig, l=o.x,r=o.x+o.w,t=o.y,b=o.y+o.h, h=cop.h;
+        if(h.indexOf("w")>=0) l=ip.x; if(h.indexOf("e")>=0) r=ip.x; if(h.indexOf("n")>=0) t=ip.y; if(h.indexOf("s")>=0) b=ip.y;
+        crop.x=Math.min(l,r); crop.y=Math.min(t,b); crop.w=Math.abs(r-l); crop.h=Math.abs(b-t); clampCrop(); cropRender(); return; }
+    });
+    stage.addEventListener("pointerup",function(){ if(cop&&cop.kind==="pan") stage.classList.remove("panning"); cop=null; });
+
+    $("cropBtn").addEventListener("click",openCrop);
+    $("cropZoomIn").addEventListener("click",function(){ var r=srect(); zoomAt({sx:r.width/2,sy:r.height/2},1.25); });
+    $("cropZoomOut").addEventListener("click",function(){ var r=srect(); zoomAt({sx:r.width/2,sy:r.height/2},1/1.25); });
+    $("cropFit").addEventListener("click",fitView);
+    $("cropFull").addEventListener("click",function(){ crop={x:0,y:0,w:natW,h:natH}; cropRender(); });
+    $("cropCancel").addEventListener("click",closeCrop);
+    $("cropApply").addEventListener("click",doApply);
+    document.addEventListener("keydown",function(e){ if(modal.hidden) return;
+      if(e.key==="Escape"){ e.preventDefault(); closeCrop(); }
+      else if(e.key==="Enter"){ e.preventDefault(); doApply(); }
+      else if(e.key===" "){ spaceDown=true; e.preventDefault(); } });
+    document.addEventListener("keyup",function(e){ if(e.key===" ") spaceDown=false; });
+
+    function applyCrop(c){
+      c.x=Math.round(Math.max(0,c.x)); c.y=Math.round(Math.max(0,c.y));
+      c.w=Math.round(Math.min(natW-c.x,c.w)); c.h=Math.round(Math.min(natH-c.y,c.h));
+      if(c.w<1||c.h<1) return;
+      if(c.x===0&&c.y===0&&c.w===natW&&c.h===natH) return;        // whole image -> nothing to do
+      var cv=document.createElement("canvas"); cv.width=c.w; cv.height=c.h;
+      cv.getContext("2d").drawImage(img, c.x,c.y,c.w,c.h, 0,0,c.w,c.h);
+      var url; try{ url=cv.toDataURL("image/png"); }catch(err){ alert("Couldn't crop this image."); return; }
+      var oW=natW,oH=natH, nx=c.x/oW, ny=c.y/oH, nw=c.w/oW, nh=c.h/oH;   // re-map annotations into the new frame
+      items.forEach(function(it){
+        if(it.kind==="arrow"||it.kind==="line"){ it.x1=(it.x1-nx)/nw; it.y1=(it.y1-ny)/nh; it.x2=(it.x2-nx)/nw; it.y2=(it.y2-ny)/nh; }
+        else if(it.kind==="marker"){ it.x=(it.x-nx)/nw; it.y=(it.y-ny)/nh; }
+        else { it.x=(it.x-nx)/nw; it.y=(it.y-ny)/nh; it.w=it.w/nw; it.h=it.h/nh; }
+      });
+      imgDataURL=url; natW=c.w; natH=c.h; curImgId=putImage(url,natW,natH); zoomScale=null;
+      img.onload=function(){ frame.hidden=false; hint.style.display="none"; render(); updateZoomUI(); };
+      img.src=url; render(); updateZoomUI(); saveImage(); commit();
+    }
+  })();
+
+  // ---- layout: Auto stacks when the panel area is narrow (handles split-screen); manual override cycles the mode ----
+  (function(){
+    var mainEl=document.querySelector("main"), btn=$("layoutBtn"), LSK="ptools.annotate.layout", AUTO_THRESH=1000;
+    var mode=lsGet(LSK)||"auto"; if(["auto","stack","wide"].indexOf(mode)<0) mode="auto";
+    function apply(){
+      mainEl.classList.remove("stack","nowrap");
+      if(mode==="stack") mainEl.classList.add("stack");
+      else if(mode==="wide") mainEl.classList.add("nowrap");
+      else if(mainEl.clientWidth && mainEl.clientWidth<AUTO_THRESH) mainEl.classList.add("stack");   // auto
+      btn.textContent="Layout: "+(mode==="auto"?"Auto":mode==="stack"?"Stacked":"Side‑by‑side");
+    }
+    btn.addEventListener("click",function(){ mode=mode==="auto"?"stack":mode==="stack"?"wide":"auto"; lsSet(LSK,mode); apply(); });
+    if(window.ResizeObserver){ new ResizeObserver(function(){ if(mode==="auto") apply(); }).observe(mainEl); }
+    else window.addEventListener("resize",function(){ if(mode==="auto") apply(); });
+    apply();
+  })();
+
+  window.addEventListener("resize",function(){ if(natW){ if(zoomScale==null) applyZoom(); else render(); } });   // re-fit on resize
+  restore(); setMode("select"); render(); updateZoomUI(); commit();   // seed history with the initial (restored or empty) state
+})();
+</script>
+</body>
+</html>
