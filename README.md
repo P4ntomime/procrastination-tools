@@ -11,8 +11,8 @@ file in a browser and the tool runs.
 
 | Tool | What it does | Open |
 |---|---|---|
-| [annotate.html](annotate.html) | Draws markers, boxes, circles and arrows over a screenshot and exports an editable vector overlay. | [Run](https://USERNAME.github.io/procrastination-tools/annotate.html) |
-| [gantt-a4.html](gantt-a4.html) | Turns plain text into a Gantt chart that prints on one A4 sheet. | [Run](https://USERNAME.github.io/procrastination-tools/gantt-a4.html) |
+| [annotate.html](annotate.html) | Draws markers, boxes, circles and arrows over a screenshot and exports an editable vector overlay. | [Run](https://P4ntomime.github.io/procrastination-tools/annotate.html) |
+| [gantt-a4.html](gantt-a4.html) | Turns plain text into a Gantt chart that prints on one A4 sheet. | [Run](https://P4ntomime.github.io/procrastination-tools/gantt-a4.html) |
 
 ### annotate
 
