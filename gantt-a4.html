@@ -302,6 +302,7 @@ try{ var _t=localStorage.getItem("ptools.theme"); if(_t==="dark"||_t==="light") 
           extras after the dates, any order: <code>60%</code> progress,
           <code>@id</code> name it, <code>&gt;id,id2</code> depends on.
           <code>//</code> comment, <code>%title …</code> heading.
+          The <code>%</code> block below the title holds the page settings.
         </p>
       </section>
 
@@ -392,6 +393,11 @@ try{ var _t=localStorage.getItem("ptools.theme"); if(_t==="dark"||_t==="light") 
               <option value="1.5">150%</option>
             </select></div>
         </div>
+        <p class="note" style="margin:8px 0 0">
+          Page, Colours and Chart are written into the source as <code>%</code> lines,
+          so a saved or linked <code>.gantt</code> file brings them back with it.
+          Preview zoom stays in this browser.
+        </p>
       </section>
 
       <section>
@@ -471,6 +477,62 @@ const RX_ID=/^@([A-Za-z0-9_-]+)$/;
 const RX_DEP=/^>\s*([A-Za-z0-9_,\s-]+)$/;
 const RX_HEX=/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
+/* Every control in the Page, Colours and Chart panels is written into the plan as
+   a %directive, so a .gantt file carries its own layout and comes back the same
+   wherever it is opened. Preview zoom is left out on purpose: it describes the
+   window, not the document.
+   Table order is the order the block is written in. Each entry is
+   [option key, directive name, type, ...bounds]. */
+const SET=[
+  ["orient" ,"orientation"    ,"enum",{landscape:"landscape",portrait:"portrait"}],
+  ["unit"   ,"unit"           ,"enum",{w:"w",week:"w",weeks:"w",d:"d",day:"d",days:"d",
+                                       m:"m",month:"m",months:"m"}],
+  ["margin" ,"margin"         ,"num" ,5,30],
+  ["rowH"   ,"rowheight"      ,"num" ,3,12],
+  ["labelW" ,"labelwidth"     ,"num" ,25,120],
+  ["fs"     ,"fontsize"       ,"num" ,4,12],
+  ["maxCols","maxcolumns"     ,"num" ,0,400],
+  ["face"   ,"typeface"       ,"enum",{sans:"sans",serif:"serif",mono:"mono"}],
+  ["dates"  ,"datecolumns"    ,"bool"],
+  ["arrows" ,"arrows"         ,"bool"],
+  ["groups" ,"phasebars"      ,"bool"],
+  ["prog"   ,"progress"       ,"bool"],
+  ["notes"  ,"notespage"      ,"bool"],
+  ["pweek"  ,"projectweeks"   ,"bool"],
+  ["today"  ,"todayline"      ,"bool"],
+  ["colour" ,"colourbyphase"  ,"bool"],
+  ["zebra"  ,"rowbands"       ,"bool"],
+  ["legend" ,"footer"         ,"bool"],
+  ["cTask"  ,"colourtask"     ,"hex"],
+  ["cPhase" ,"colourphase"    ,"hex"],
+  ["cMs"    ,"colourmilestone","hex"],
+  ["cToday" ,"colourtoday"    ,"hex"]
+];
+const SETBY=new Map(SET.map(sp=>[sp[1],sp]));
+const BOOLS={on:true,yes:true,true:true,"1":true,off:false,no:false,false:false,"0":false};
+const RX_NUM=/^-?\d+(?:\.\d+)?\s*(?:mm|pt)?$/;
+
+/* A bad value keeps the current setting rather than guessing one. The message
+   carries no line number: the block is rewritten in place straight afterwards,
+   which would leave a stale number pointing at the wrong line. */
+function setParse(sp,val){
+  const t=(val||"").trim(), lo=t.toLowerCase(), nm="%"+sp[1];
+  if(sp[2]==="enum"){
+    const v=sp[3][lo];
+    return v?{v}:{err:`${nm}: expected ${[...new Set(Object.values(sp[3]))].join(", ")}`};
+  }
+  if(sp[2]==="bool") return (lo in BOOLS)?{v:BOOLS[lo]}:{err:`${nm}: expected on or off`};
+  if(sp[2]==="hex"){
+    if(!RX_HEX.test(lo)) return {err:`${nm}: expected a colour like #2f6f9f`};
+    return {v: lo.length===4 ? "#"+lo[1]+lo[1]+lo[2]+lo[2]+lo[3]+lo[3] : lo};
+  }
+  if(!RX_NUM.test(lo)) return {err:`${nm}: expected a number between ${sp[3]} and ${sp[4]}`};
+  const n=parseFloat(lo);
+  if(n<sp[3]||n>sp[4]) return {err:`${nm}: ${n} is outside ${sp[3]} to ${sp[4]}`};
+  return {v:n};
+}
+function setText(sp,v){ return sp[2]==="bool" ? (v?"on":"off") : String(v); }
+
 function parse(text){
   const items=[], errs=[];
   text.split(/\r?\n/).forEach((raw,i)=>{
@@ -491,7 +553,12 @@ function parse(text){
     if(s.startsWith("%")){
       const m=/^%\s*([A-Za-z]+)\s*(.*)$/.exec(s);
       if(!m){ errs.push(`line ${ln}: directive needs a name, e.g. %title My plan`); items.push({kind:"raw",raw}); return; }
-      items.push({kind:"dir",key:m[1].toLowerCase(),val:m[2].trim()}); return;
+      const it={kind:"dir",key:m[1].toLowerCase(),val:m[2].trim()};
+      const sp=SETBY.get(it.key);
+      if(sp){ const r=setParse(sp,it.val);
+        if(r.err) errs.push(r.err+" \u2014 kept the current setting");
+        else { it.opt=sp[0]; it.v=r.v; } }
+      items.push(it); return;
     }
     if(s.startsWith("#")){
       const seg=s.replace(/^#+\s*/,"").split("|").map(x=>x.trim());
@@ -952,8 +1019,32 @@ const $=id=>document.getElementById(id);
 const SEED=`%title Example plan — weather station build
 %subtitle Replace this with your own plan. The Reset panel reloads this example.
 %notestitle Notes
+%orientation landscape
+%unit w
+%margin 12
+%rowheight 4.8
+%labelwidth 68
+%fontsize 7.5
+%maxcolumns 0
+%typeface sans
+%datecolumns on
+%arrows on
+%phasebars on
+%progress on
+%notespage on
+%projectweeks on
+%todayline on
+%colourbyphase on
+%rowbands on
+%footer on
+%colourtask #2f6f9f
+%colourphase #5c6773
+%colourmilestone #8a6d1f
+%colourtoday #c0392b
 
 // Lines that start with // are comments. They survive a round trip.
+// The %lines above are the Page, Colours and Chart panels. Moving a control
+// rewrites them, and editing one here moves the control.
 // A task is "Name | start | end-or-duration". A milestone is "! Name | date".
 // A phase is "# Name". After the dates, in any order: 60% progress,
 // @id to name a row, >id to make it depend on another row, #rrggbb to recolour it.
@@ -1007,6 +1098,57 @@ function readOpt(){
 function writeOpt(o){ for(const k in CTL){ const e=$(CTL[k]);
   if(e.type==="checkbox") e.checked=!!o[k]; else e.value=o[k]; } }
 
+/* ---- settings: source to panels, and panels back to source ---- */
+
+/* A key the file leaves out keeps whatever the panel already holds, so plans
+   written before the settings block existed open exactly as they did. */
+function applySettings(){
+  ITEMS.forEach(it=>{
+    if(it.kind!=="dir"||it.opt===undefined) return;
+    const e=$(CTL[it.opt]);
+    if(e.type==="checkbox") e.checked=it.v; else e.value=it.v;
+  });
+  $("pagerule").textContent="@page{size:A4 "+$("orient").value+";margin:0}";
+}
+function settingsBlock(opt){ return SET.map(sp=>"%"+sp[1]+" "+setText(sp,opt[sp[0]])); }
+
+/* Rewrite the block in place, in one piece, directly below the %title group.
+   A setting typed by hand further down the file is read and then moved up here.
+   The source box is also something the user types in, so the caret and the
+   scroll position are carried across the rewrite; the text is only touched when
+   it actually differs. */
+function syncBlock(opt){
+  const ta=$("src"), old=ta.value, want=settingsBlock(opt);
+  const lines=old.split("\n"), keep=[], from=[];
+  let at=0, lead=true;
+  for(let i=0;i<lines.length;i++){
+    const t=lines[i].trim(), m=/^%\s*([A-Za-z]+)/.exec(t);
+    if(lead&&t!==""&&!t.startsWith("//")&&!t.startsWith("%")) lead=false;
+    if(m&&SETBY.has(m[1].toLowerCase())) continue;          // the old block, wherever it sat
+    keep.push(lines[i]); from.push(i);
+    if(lead&&t.startsWith("%")) at=keep.length;
+  }
+  const ins=want.slice();
+  if(at<keep.length&&keep[at].trim()!=="") ins.push("");
+  const out=keep.slice(0,at).concat(ins,keep.slice(at));
+  const next=out.join("\n");
+  if(next===old) return false;
+
+  const focused=document.activeElement===ta, top=ta.scrollTop;
+  const map=c=>{                                   // same character, new offset
+    let off=0,L=0;
+    for(;L<lines.length-1;L++){ const e=off+lines[L].length; if(c<=e) break; off=e+1; }
+    const col=c-off, p=from.indexOf(L);
+    const q=p<0?at:(p<at?p:p+ins.length);          // a caret inside the old block lands on the new one
+    let no=0; for(let i=0;i<q&&i<out.length;i++) no+=out[i].length+1;
+    return no+(p<0?0:Math.min(col,out[q]===undefined?0:out[q].length));
+  };
+  const a=focused?map(ta.selectionStart):0, b=focused?map(ta.selectionEnd):0;
+  ta.value=next; ta.scrollTop=top;
+  if(focused){ try{ ta.setSelectionRange(a,b); }catch(e){} }
+  return true;
+}
+
 /* ========================= persistence ========================= */
 function save(){ try{ localStorage.setItem("ptools.gantt-a4.state",JSON.stringify({src:$("src").value,opt:readOpt()})); }catch(e){} }
 function load(){ try{ const r=localStorage.getItem("ptools.gantt-a4.state"); if(!r) return null; return JSON.parse(r); }catch(e){ return null; } }
@@ -1017,9 +1159,14 @@ function measure(){
   document.body.appendChild(p); PXMM=p.getBoundingClientRect().width/100; p.remove();
 }
 let ERRS=[];
+/* reparse: false keeps ITEMS as they are, "ui" reparses but lets the panels win,
+   because the control the user just moved is newer than the text. */
 function rebuild(reparse){
   if(reparse!==false){ const r=parse($("src").value); ITEMS=r.items; ERRS=r.errs; }
+  if(reparse!=="ui") applySettings();
   const opt=readOpt();
+  if(syncBlock(opt)){ const r=parse($("src").value); ITEMS=r.items;
+    ERRS=[...new Set(ERRS.concat(r.errs))]; }
   // "Task bars" has no effect while phases drive the colour — say so and grey it out
   $("kTask").disabled=opt.colour;
   $("kTask").closest("label").style.opacity=opt.colour?".45":"1";
@@ -1278,7 +1425,7 @@ $("src").addEventListener("input",()=>{ clearTimeout(tmr);
   tmr=setTimeout(()=>{selIdx=-1;rebuild();scheduleWrite();},220); });
 for(const k in CTL) $(CTL[k]).addEventListener("change",()=>{
   if(k==="orient"){ $("pagerule").textContent="@page{size:A4 "+$("orient").value+";margin:0}"; }
-  rebuild();
+  rebuild("ui"); scheduleWrite();            // zoom is not in the block, so that write is a no-op
 });
 $("printBtn").onclick=()=>window.print();
 $("fmtBtn").onclick=()=>commit();
@@ -1295,7 +1442,12 @@ $("saveBtn").onclick=()=>{
 $("loadBtn").onclick=()=>$("fileIn").click();
 $("fileIn").onchange=e=>{ const f=e.target.files[0]; if(!f) return;
   const rd=new FileReader(); rd.onload=()=>{ $("src").value=rd.result; selIdx=-1; rebuild(); scheduleWrite(); }; rd.readAsText(f); };
-$("seedBtn").onclick=()=>{ if(!$("src").value.trim()||confirmReplace()){ $("src").value=SEED; selIdx=-1; rebuild(); } };
+$("seedBtn").onclick=()=>{ if(plainEmpty()||confirmReplace()){ $("src").value=SEED; selIdx=-1; rebuild(); } };
+/* The block is always present, so a cleared plan is never an empty string. */
+function plainEmpty(){
+  return !ITEMS.some(it=>it.kind==="task"||it.kind==="ms"||it.kind==="phase"
+                      ||(it.kind==="dir"&&it.opt===undefined));
+}
 function confirmReplace(){ return window.confirm("Replace the current plan with the example?"); }
 /* App theme. The key is shared with the other tools on this origin, so the
    choice carries across them, and a storage event keeps open tabs in step. */
@@ -1646,7 +1798,8 @@ async function attach(h,writeMine){
   return true;
 }
 
-function adopt(txt){ $("src").value=txt; link.lastSync=txt; selIdx=-1; rebuild(); }
+function adopt(txt){ $("src").value=txt; link.lastSync=txt; selIdx=-1; rebuild();
+  if($("src").value!==link.lastSync) scheduleWrite(); }   // the block we just added belongs on disk too
 
 function scheduleWrite(){ if(!link) return; clearTimeout(wTimer); wTimer=setTimeout(writeOut,500); }
 async function writeOut(){
